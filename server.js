@@ -512,101 +512,204 @@ app.post('/api/etiquettes/pdf', (req, res) => {
       const startX = col * labelWidth;
       const startY = row * labelHeight;
 
-      // Bordure de l'étiquette
+      // Bordure de l'étiquette avec double trait pour effet pro
+      doc.lineWidth(1.5);
       doc.rect(startX, startY, labelWidth, labelHeight).stroke();
+      doc.lineWidth(0.5);
+      doc.rect(startX + 3, startY + 3, labelWidth - 6, labelHeight - 6).stroke();
+      doc.lineWidth(1);
 
-      let currentY = startY + margin;
+      let currentY = startY + margin + 5;
+
+      // ===== ZONE EN-TÊTE (Logo + Tracking) =====
+      const headerHeight = logoData ? 55 : 0;
 
       // Logo (si disponible)
       if (logoData) {
         try {
           const logoBuffer = Buffer.from(logoData.split(',')[1], 'base64');
-          doc.image(logoBuffer, startX + margin, currentY, { width: labelWidth - 2 * margin, height: 40, fit: [labelWidth - 2 * margin, 40] });
-          currentY += 45;
+          doc.image(logoBuffer, startX + margin + 5, currentY, {
+            width: labelWidth - 2 * margin - 10,
+            height: 35,
+            fit: [labelWidth - 2 * margin - 10, 35]
+          });
+          currentY += 40;
         } catch (e) {
-          // Si erreur de logo, on continue sans
           console.error('Erreur chargement logo:', e.message);
         }
       }
 
-      // Numéro de suivi
-      doc.fontSize(10).font('Helvetica-Bold').text('N° Suivi:', startX + margin, currentY, { width: labelWidth - 2 * margin });
-      currentY += 12;
-      doc.fontSize(9).font('Helvetica').text(colis.numero_suivi || 'N/A', startX + margin, currentY, { width: labelWidth - 2 * margin });
-      currentY += 12;
+      // ===== ZONE NUMÉRO DE SUIVI (avec fond gris) =====
+      const trackingBoxY = currentY;
+      doc.fillAndStroke('#f0f0f0', '#cccccc')
+         .roundedRect(startX + margin, trackingBoxY, labelWidth - 2 * margin, 48, 3)
+         .fillAndStroke();
 
-      // Code-barres simulé
-      doc.fontSize(8).font('Courier').text(`||| ${colis.numero_suivi || 'N/A'} |||`, startX + margin, currentY, { width: labelWidth - 2 * margin, align: 'center' });
-      currentY += 15;
-
-      // Ligne de séparation
-      doc.moveTo(startX + margin, currentY).lineTo(startX + labelWidth - margin, currentY).stroke();
-      currentY += 5;
-
-      // DESTINATAIRE
-      doc.fontSize(9).font('Helvetica-Bold').text('DESTINATAIRE:', startX + margin, currentY, { width: labelWidth - 2 * margin });
-      currentY += 12;
-
-      // Nom + Prénom
-      doc.fontSize(9).font('Helvetica-Bold').text(
-        `${colis.client_nom || ''} ${colis.client_prenom || ''}`.trim(),
-        startX + margin,
-        currentY,
-        { width: labelWidth - 2 * margin }
-      );
-      currentY += 12;
-
-      // Adresse (ligne 1)
-      doc.fontSize(8).font('Helvetica').text(
-        colis.adresse_expedition || colis.client_adresse || '',
-        startX + margin,
-        currentY,
-        { width: labelWidth - 2 * margin }
-      );
+      currentY += 8;
+      doc.fillColor('#000000')
+         .fontSize(8)
+         .font('Helvetica')
+         .text('NUMÉRO DE SUIVI', startX + margin + 5, currentY, {
+           width: labelWidth - 2 * margin - 10,
+           align: 'center'
+         });
       currentY += 10;
 
-      // Adresse (ligne 2) - si présente
+      doc.fontSize(11)
+         .font('Helvetica-Bold')
+         .text(colis.numero_suivi || 'N/A', startX + margin + 5, currentY, {
+           width: labelWidth - 2 * margin - 10,
+           align: 'center'
+         });
+      currentY += 14;
+
+      // Code-barres stylisé
+      doc.fontSize(9)
+         .font('Courier-Bold')
+         .text(`|||  ${colis.numero_suivi || 'N/A'}  |||`, startX + margin + 5, currentY, {
+           width: labelWidth - 2 * margin - 10,
+           align: 'center'
+         });
+      currentY += 20;
+
+      // ===== ZONE DESTINATAIRE (avec fond bleu clair) =====
+      const destBoxY = currentY;
+      const destBoxHeight = colis.adresse_ligne2 ? 100 : 90;
+
+      doc.fillAndStroke('#e8f4f8', '#4a90e2')
+         .lineWidth(1.5)
+         .roundedRect(startX + margin, destBoxY, labelWidth - 2 * margin, destBoxHeight, 3)
+         .fillAndStroke();
+      doc.lineWidth(1);
+
+      currentY += 8;
+      doc.fillColor('#ffffff')
+         .fontSize(9)
+         .font('Helvetica-Bold')
+         .fillAndStroke('#4a90e2', '#4a90e2')
+         .roundedRect(startX + margin + 5, currentY - 2, 85, 14, 2)
+         .fillAndStroke();
+
+      doc.fillColor('#ffffff')
+         .text('DESTINATAIRE', startX + margin + 10, currentY, {
+           width: 75
+         });
+      currentY += 18;
+
+      // Nom + Prénom (en gros et gras)
+      doc.fillColor('#000000')
+         .fontSize(11)
+         .font('Helvetica-Bold')
+         .text(
+           `${colis.client_nom || ''} ${colis.client_prenom || ''}`.trim().toUpperCase(),
+           startX + margin + 8,
+           currentY,
+           { width: labelWidth - 2 * margin - 16 }
+         );
+      currentY += 15;
+
+      // Adresse ligne 1
+      doc.fontSize(9)
+         .font('Helvetica')
+         .text(
+           colis.adresse_expedition || colis.client_adresse || '',
+           startX + margin + 8,
+           currentY,
+           { width: labelWidth - 2 * margin - 16 }
+         );
+      currentY += 12;
+
+      // Adresse ligne 2 (si présente)
       if (colis.adresse_ligne2) {
         doc.text(
           colis.adresse_ligne2,
-          startX + margin,
+          startX + margin + 8,
           currentY,
-          { width: labelWidth - 2 * margin }
+          { width: labelWidth - 2 * margin - 16 }
         );
-        currentY += 10;
-      } else {
-        currentY += 10;
+        currentY += 12;
       }
 
-      // Code postal + Ville
-      doc.text(
-        `${colis.code_postal_expedition || colis.client_code_postal || ''} ${colis.ville_expedition || colis.client_ville || ''}`.trim(),
-        startX + margin,
-        currentY,
-        { width: labelWidth - 2 * margin }
-      );
-      currentY += 10;
+      // Code postal + Ville (en gras)
+      doc.fontSize(10)
+         .font('Helvetica-Bold')
+         .text(
+           `${colis.code_postal_expedition || colis.client_code_postal || ''} ${colis.ville_expedition || colis.client_ville || ''}`.trim(),
+           startX + margin + 8,
+           currentY,
+           { width: labelWidth - 2 * margin - 16 }
+         );
+      currentY += 13;
 
-      // Pays
-      doc.text(colis.pays_expedition || colis.client_pays || 'France', startX + margin, currentY, { width: labelWidth - 2 * margin });
-      currentY += 15;
+      // Pays (encadré si différent de France)
+      const pays = colis.pays_expedition || colis.client_pays || 'France';
+      if (pays.toLowerCase() !== 'france') {
+        doc.fillAndStroke('#ffe066', '#ffb800')
+           .roundedRect(startX + margin + 8, currentY - 2, 60, 14, 2)
+           .fillAndStroke();
+        doc.fillColor('#000000')
+           .fontSize(9)
+           .font('Helvetica-Bold')
+           .text(pays, startX + margin + 10, currentY, { width: 56 });
+      } else {
+        doc.fillColor('#000000')
+           .fontSize(9)
+           .font('Helvetica')
+           .text(pays, startX + margin + 8, currentY, { width: labelWidth - 2 * margin - 16 });
+      }
+      currentY = destBoxY + destBoxHeight + 10;
 
-      // Ligne de séparation
-      doc.moveTo(startX + margin, currentY).lineTo(startX + labelWidth - margin, currentY).stroke();
-      currentY += 5;
+      // ===== ZONE INFORMATIONS COLIS (pied de page) =====
+      const infoBoxY = currentY;
 
-      // Informations colis (plus compact)
-      doc.fontSize(7).font('Helvetica').text(
-        `Poids: ${colis.poids || 'N/A'} kg | Dim: ${colis.dimensions || 'N/A'}`,
-        startX + margin,
-        currentY,
-        { width: labelWidth - 2 * margin }
-      );
-      currentY += 10;
+      // Encadré pour poids et dimensions
+      doc.fillAndStroke('#f9f9f9', '#dddddd')
+         .roundedRect(startX + margin, infoBoxY, (labelWidth - 2 * margin) / 2 - 3, 28, 2)
+         .fillAndStroke();
 
-      // Référence (au lieu des notes)
+      doc.fillColor('#666666')
+         .fontSize(7)
+         .font('Helvetica')
+         .text('POIDS', startX + margin + 4, infoBoxY + 4, { width: 50 });
+
+      doc.fillColor('#000000')
+         .fontSize(10)
+         .font('Helvetica-Bold')
+         .text(`${colis.poids || 'N/A'} kg`, startX + margin + 4, infoBoxY + 14, {
+           width: (labelWidth - 2 * margin) / 2 - 10
+         });
+
+      // Dimensions
+      doc.fillAndStroke('#f9f9f9', '#dddddd')
+         .roundedRect(startX + margin + (labelWidth - 2 * margin) / 2 + 3, infoBoxY, (labelWidth - 2 * margin) / 2 - 3, 28, 2)
+         .fillAndStroke();
+
+      doc.fillColor('#666666')
+         .fontSize(7)
+         .font('Helvetica')
+         .text('DIMENSIONS', startX + margin + (labelWidth - 2 * margin) / 2 + 7, infoBoxY + 4, { width: 80 });
+
+      doc.fillColor('#000000')
+         .fontSize(10)
+         .font('Helvetica-Bold')
+         .text(colis.dimensions || 'N/A', startX + margin + (labelWidth - 2 * margin) / 2 + 7, infoBoxY + 14, {
+           width: (labelWidth - 2 * margin) / 2 - 10
+         });
+
+      currentY += 35;
+
+      // Référence (mise en avant)
       if (colis.reference) {
-        doc.fontSize(9).font('Helvetica-Bold').text(`Ref: ${colis.reference}`, startX + margin, currentY, { width: labelWidth - 2 * margin });
+        doc.fillAndStroke('#fff3cd', '#ffc107')
+           .roundedRect(startX + margin, currentY, labelWidth - 2 * margin, 22, 2)
+           .fillAndStroke();
+
+        doc.fillColor('#000000')
+           .fontSize(10)
+           .font('Helvetica-Bold')
+           .text(`Ref: ${colis.reference}`, startX + margin + 6, currentY + 6, {
+             width: labelWidth - 2 * margin - 12
+           });
       }
     });
 
