@@ -91,6 +91,25 @@
                     💾 Télécharger un modèle CSV
                 </button>
             </div>
+
+            <!-- OUTILS BASE DE DONNÉES -->
+            <div class="database-tools">
+                <h3>🛠️ Outils de base de données</h3>
+                <div class="tools-buttons">
+                    <button class="btn btn-success" onclick="initTestData()">
+                        🎲 Charger des données de test
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportDatabase()">
+                        💾 Exporter la base de données
+                    </button>
+                    <button class="btn btn-danger" onclick="resetDatabase()">
+                        🗑️ Réinitialiser la base de données
+                    </button>
+                </div>
+                <div id="dbToolsResult" class="import-result" style="display: none;">
+                    <div id="dbToolsResultContent"></div>
+                </div>
+            </div>
         </div>
 
         <!-- TAB COLIS -->

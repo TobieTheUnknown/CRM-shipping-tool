@@ -565,6 +565,63 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
+// ============= EXPORT / RESET DATABASE =============
+
+// Exporter la base de données
+app.get('/api/database/export', (req, res) => {
+  const dbPath = path.join(__dirname, 'crm.db');
+
+  if (!fs.existsSync(dbPath)) {
+    return res.status(404).json({ error: 'Base de données non trouvée' });
+  }
+
+  res.download(dbPath, `crm-backup-${Date.now()}.db`, (err) => {
+    if (err) {
+      console.error('Erreur export base de données:', err);
+      res.status(500).json({ error: 'Erreur lors de l\'export' });
+    }
+  });
+});
+
+// Réinitialiser la base de données
+app.post('/api/database/reset', (req, res) => {
+  const tables = ['colis_produits', 'colis', 'produits', 'clients'];
+
+  let completedCount = 0;
+  const errors = [];
+
+  tables.forEach(table => {
+    db.run(`DELETE FROM ${table}`, [], function(err) {
+      if (err) {
+        errors.push({ table, error: err.message });
+      }
+      completedCount++;
+
+      if (completedCount === tables.length) {
+        if (errors.length > 0) {
+          res.status(500).json({ error: 'Erreur lors de la réinitialisation', details: errors });
+        } else {
+          res.json({ message: 'Base de données réinitialisée avec succès' });
+        }
+      }
+    });
+  });
+});
+
+// Initialiser avec des données de test
+app.post('/api/database/init-test-data', (req, res) => {
+  const { exec } = require('child_process');
+
+  exec('node init-test-data.js', { cwd: __dirname }, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Erreur init données de test:', error);
+      return res.status(500).json({ error: 'Erreur lors de l\'initialisation', details: stderr });
+    }
+
+    res.json({ message: 'Données de test créées avec succès', output: stdout });
+  });
+});
+
 // ============= DÉMARRAGE SERVEUR =============
 
 app.listen(PORT, () => {

@@ -675,3 +675,110 @@ Casque Audio,https://example.com/product/789,149.50,0.3,"789 Boulevard Victor Hu
     link.click();
     document.body.removeChild(link);
 }
+
+// ============= DATABASE TOOLS =============
+
+// Charger des données de test
+async function initTestData() {
+    if (!confirm('Voulez-vous charger des données de test?\n\nCela créera:\n- 5 clients (France, Belgique, Italie, Espagne)\n- 6 produits (téléphones, ordinateurs, etc.)\n- 6 colis de test\n\nNote: Si des données existent déjà, elles seront conservées.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/database/init-test-data`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+        const resultDiv = document.getElementById('dbToolsResult');
+        const contentDiv = document.getElementById('dbToolsResultContent');
+
+        if (response.ok) {
+            contentDiv.innerHTML = `
+                <p class="import-success">✅ ${result.message}</p>
+                <pre style="margin-top: 10px; font-size: 0.9em;">${result.output}</pre>
+            `;
+            resultDiv.style.display = 'block';
+
+            // Rafraîchir les données
+            setTimeout(() => {
+                loadStats();
+                loadClients();
+                loadProduits();
+                loadColis();
+            }, 500);
+        } else {
+            contentDiv.innerHTML = `
+                <p class="import-error">❌ Erreur</p>
+                <p>${result.error}</p>
+            `;
+            resultDiv.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Erreur init données test:', error);
+        alert('Erreur lors du chargement des données de test');
+    }
+}
+
+// Exporter la base de données
+function exportDatabase() {
+    window.location.href = `${API_URL}/api/database/export`;
+
+    const resultDiv = document.getElementById('dbToolsResult');
+    const contentDiv = document.getElementById('dbToolsResultContent');
+    contentDiv.innerHTML = `
+        <p class="import-success">✅ Export en cours...</p>
+        <p>Le téléchargement devrait commencer automatiquement.</p>
+    `;
+    resultDiv.style.display = 'block';
+
+    setTimeout(() => {
+        resultDiv.style.display = 'none';
+    }, 3000);
+}
+
+// Réinitialiser la base de données
+async function resetDatabase() {
+    if (!confirm('⚠️ ATTENTION ⚠️\n\nÊtes-vous sûr de vouloir réinitialiser la base de données?\n\nCette action supprimera TOUTES les données:\n- Tous les clients\n- Tous les produits\n- Tous les colis\n\nCette action est IRRÉVERSIBLE!')) {
+        return;
+    }
+
+    if (!confirm('Dernière confirmation:\n\nToutes les données seront perdues.\n\nContinuer?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/database/reset`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+        const resultDiv = document.getElementById('dbToolsResult');
+        const contentDiv = document.getElementById('dbToolsResultContent');
+
+        if (response.ok) {
+            contentDiv.innerHTML = `
+                <p class="import-success">✅ ${result.message}</p>
+                <p>La base de données a été vidée.</p>
+            `;
+            resultDiv.style.display = 'block';
+
+            // Rafraîchir les données
+            setTimeout(() => {
+                loadStats();
+                loadClients();
+                loadProduits();
+                loadColis();
+            }, 500);
+        } else {
+            contentDiv.innerHTML = `
+                <p class="import-error">❌ Erreur</p>
+                <p>${result.error}</p>
+            `;
+            resultDiv.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Erreur reset base de données:', error);
+        alert('Erreur lors de la réinitialisation');
+    }
+}
