@@ -1001,27 +1001,73 @@ function updateSelection() {
 
 // ============= IMPRESSION ÉTIQUETTES PDF =============
 
+function validateColisForLabel(colisData) {
+    const errors = [];
+
+    // Vérifier le nom du client
+    if (!colisData.client_nom && !colisData.client_prenom) {
+        errors.push('Nom du destinataire manquant');
+    }
+
+    // Vérifier l'adresse
+    const adresse = colisData.adresse_expedition || colisData.client_adresse;
+    if (!adresse) {
+        errors.push('Adresse manquante');
+    }
+
+    // Vérifier la ville
+    const ville = colisData.ville_expedition || colisData.client_ville;
+    if (!ville) {
+        errors.push('Ville manquante');
+    }
+
+    // Vérifier le code postal
+    const codePostal = colisData.code_postal_expedition || colisData.client_code_postal;
+    if (!codePostal) {
+        errors.push('Code postal manquant');
+    }
+
+    return errors;
+}
+
 async function imprimerEtiquettesSelection() {
     if (selectedColis.size === 0) {
         alert('Veuillez sélectionner au moins un colis');
         return;
     }
 
-    // Demander AVANT la génération si l'utilisateur veut marquer comme envoyés
-    const nombreColis = selectedColis.size;
-    const messageConfirm = nombreColis === 1
-        ? 'Voulez-vous passer ce colis en "Envoyé" ?'
-        : `Voulez-vous passer ces ${nombreColis} colis en "Envoyé" ?`;
-
-    const marquerExpedies = confirm(messageConfirm);
-
-    // Si oui, marquer comme expédiés AVANT de générer le PDF
-    if (marquerExpedies) {
-        await marquerColisExpedies(Array.from(selectedColis));
+    // Valider tous les colis sélectionnés AVANT toute action
+    const colisInvalides = [];
+    for (const colisId of selectedColis) {
+        const colisData = colis.find(c => c.id === colisId);
+        if (colisData) {
+            const errors = validateColisForLabel(colisData);
+            if (errors.length > 0) {
+                colisInvalides.push({
+                    numero: colisData.numero_suivi || `ID: ${colisId}`,
+                    errors: errors
+                });
+            }
+        }
     }
 
+    // Si des colis ont des infos manquantes, alerter et arrêter
+    if (colisInvalides.length > 0) {
+        let message = '⚠️ Impossible de générer les étiquettes.\n\nInformations manquantes:\n\n';
+        colisInvalides.forEach(c => {
+            message += `📦 ${c.numero}:\n`;
+            c.errors.forEach(e => {
+                message += `   • ${e}\n`;
+            });
+            message += '\n';
+        });
+        message += 'Veuillez compléter ces informations avant de réessayer.';
+        alert(message);
+        return;
+    }
+
+    // Générer le PDF d'abord
     try {
-        // Récupérer le logo depuis localStorage
         const logoData = localStorage.getItem('shippingLogo');
 
         const response = await fetch(`${API_URL}/api/etiquettes/pdf`, {
@@ -1044,7 +1090,15 @@ async function imprimerEtiquettesSelection() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
-            // Pas d'alerte de succès - le téléchargement du PDF est suffisant
+            // Seulement APRÈS succès du PDF, demander si on marque comme envoyés
+            const nombreColis = selectedColis.size;
+            const messageConfirm = nombreColis === 1
+                ? 'Étiquette générée! Voulez-vous passer ce colis en "Envoyé" ?'
+                : `Étiquettes générées! Voulez-vous passer ces ${nombreColis} colis en "Envoyé" ?`;
+
+            if (confirm(messageConfirm)) {
+                await marquerColisExpedies(Array.from(selectedColis));
+            }
         } else {
             alert('Erreur lors de la génération du PDF');
         }
@@ -1318,16 +1372,13 @@ async function importDatabase() {
         if (response.ok) {
             contentDiv.innerHTML = `
                 <p class="import-success">✅ ${result.message}</p>
-                <p>La base de données a été importée avec succès.</p>
+                <p>Rechargement de la page...</p>
             `;
 
-            // Rafraîchir toutes les données
+            // Recharger la page pour réinitialiser toutes les connexions
             setTimeout(() => {
-                loadStats();
-                loadClients();
-                loadProduits();
-                loadColis();
-            }, 500);
+                window.location.reload();
+            }, 1500);
         } else {
             contentDiv.innerHTML = `
                 <p class="import-error">❌ Erreur lors de l'import</p>

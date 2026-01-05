@@ -5,3 +5,8 @@ node_modules/
 .DS_Store
 uploads/
 .npm-cache/
+dist/
+*.dmg
+*.exe
+*.AppImage
+*.deb
