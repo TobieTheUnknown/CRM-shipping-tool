@@ -987,13 +987,71 @@ async function imprimerEtiquettesSelection() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
-            alert(`${selectedColis.size} étiquette(s) générée(s) avec succès!\n\nFormat: 6 étiquettes par page (2x3)`);
+            // Demander si l'utilisateur veut marquer les colis comme expédiés
+            const nombreColis = selectedColis.size;
+            const messageConfirm = nombreColis === 1
+                ? 'Voulez-vous passer ce colis en "Expédié" ?'
+                : `Voulez-vous passer ces ${nombreColis} colis en "Expédié" ?`;
+
+            if (confirm(messageConfirm)) {
+                await marquerColisExpedies(Array.from(selectedColis));
+                alert(`${nombreColis} étiquette(s) générée(s) avec succès!\nColis marqués comme "Expédié".`);
+            } else {
+                alert(`${nombreColis} étiquette(s) générée(s) avec succès!\n\nFormat: 6 étiquettes par page (2x3)`);
+            }
         } else {
             alert('Erreur lors de la génération du PDF');
         }
     } catch (error) {
         console.error('Erreur impression étiquettes:', error);
         alert('Erreur lors de l\'impression');
+    }
+}
+
+async function marquerColisExpedies(colisIds) {
+    try {
+        // Mettre à jour chaque colis
+        for (const colisId of colisIds) {
+            // Trouver le colis dans le tableau
+            const colisData = colis.find(c => c.id === colisId);
+            if (!colisData) continue;
+
+            // Préparer les données de mise à jour avec le nouveau statut
+            const updateData = {
+                client_id: colisData.client_id,
+                numero_suivi: colisData.numero_suivi,
+                statut: 'Expédié',
+                poids: colisData.poids,
+                dimensions: colisData.dimensions,
+                reference: colisData.reference,
+                adresse_expedition: colisData.adresse_expedition,
+                adresse_ligne2: colisData.adresse_ligne2,
+                ville_expedition: colisData.ville_expedition,
+                code_postal_expedition: colisData.code_postal_expedition,
+                pays_expedition: colisData.pays_expedition,
+                date_expedition: new Date().toISOString().split('T')[0],
+                date_livraison: colisData.date_livraison,
+                notes: colisData.notes
+            };
+
+            // Mettre à jour le colis
+            await fetch(`${API_URL}/api/colis/${colisId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            });
+        }
+
+        // Recharger la liste des colis et les stats
+        await loadColis();
+        await loadStats();
+
+        // Désélectionner tous les colis
+        selectedColis.clear();
+        updateSelectionUI();
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour des statuts:', error);
+        alert('Erreur lors de la mise à jour du statut des colis');
     }
 }
 
