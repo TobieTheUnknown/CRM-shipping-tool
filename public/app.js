@@ -3,6 +3,7 @@ const API_URL = '';
 let clients = [];
 let produits = [];
 let colis = [];
+let dimensions = [];
 let selectedColis = new Set();
 
 // ============= INITIALISATION =============
@@ -13,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadClients();
     loadProduits();
     loadColis();
+    loadDimensions();
 });
 
 function initTabs() {
@@ -692,6 +694,7 @@ function editProduit(id) {
     document.getElementById('produitPrix').value = produit.prix || '';
     document.getElementById('produitPoids').value = produit.poids || '';
     document.getElementById('produitStock').value = produit.stock || 0;
+    document.getElementById('produitDimensionId').value = produit.dimension_id || '';
 
     document.getElementById('modalProduit').classList.add('active');
 }
@@ -700,12 +703,14 @@ async function saveProduit(event) {
     event.preventDefault();
 
     const id = document.getElementById('produitId').value;
+    const dimensionId = document.getElementById('produitDimensionId').value;
     const data = {
         nom: document.getElementById('produitNom').value,
         description: document.getElementById('produitDescription').value,
         prix: parseFloat(document.getElementById('produitPrix').value) || null,
         poids: parseFloat(document.getElementById('produitPoids').value) || null,
-        stock: parseInt(document.getElementById('produitStock').value) || 0
+        stock: parseInt(document.getElementById('produitStock').value) || 0,
+        dimension_id: dimensionId ? parseInt(dimensionId) : null
     };
 
     try {
@@ -1384,6 +1389,152 @@ async function resetDatabase() {
     } catch (error) {
         console.error('Erreur reset base de données:', error);
         alert('Erreur lors de la réinitialisation');
+    }
+}
+
+// ============= DIMENSIONS DE CARTONS =============
+
+async function loadDimensions() {
+    try {
+        const response = await fetch(`${API_URL}/api/dimensions`);
+        dimensions = await response.json();
+        displayDimensions();
+        updateDimensionButtons();
+        updateDimensionSelect();
+    } catch (error) {
+        console.error('Erreur chargement dimensions:', error);
+    }
+}
+
+function displayDimensions() {
+    const container = document.getElementById('dimensionsList');
+    if (!container) return;
+
+    if (dimensions.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #666;">Aucune dimension configurée</p>';
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="dimensions-table">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Dimensions (L×l×H)</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${dimensions.map(d => `
+                    <tr>
+                        <td><strong>${d.nom}</strong></td>
+                        <td><code>${d.longueur}×${d.largeur}×${d.hauteur} cm</code></td>
+                        <td class="actions">
+                            <button class="btn btn-edit btn-small" onclick="editDimension(${d.id})">✏️</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteDimension(${d.id})">🗑️</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function updateDimensionButtons() {
+    const container = document.getElementById('dimensionButtons');
+    if (!container) return;
+
+    if (dimensions.length === 0) {
+        container.innerHTML = '<span style="color: #666; font-size: 12px;">Configurez vos dimensions dans Paramètres</span>';
+        return;
+    }
+
+    container.innerHTML = dimensions.map(d =>
+        `<button type="button" class="btn-dimension" onclick="setDimension('${d.longueur}x${d.largeur}x${d.hauteur}')" title="${d.nom}">${d.longueur}x${d.largeur}x${d.hauteur}</button>`
+    ).join('');
+}
+
+function updateDimensionSelect() {
+    const select = document.getElementById('produitDimensionId');
+    if (!select) return;
+
+    const currentValue = select.value;
+    select.innerHTML = '<option value="">Aucune dimension par défaut</option>' +
+        dimensions.map(d => `<option value="${d.id}">${d.nom} (${d.longueur}×${d.largeur}×${d.hauteur} cm)</option>`).join('');
+    select.value = currentValue;
+}
+
+function editDimension(id) {
+    const dimension = dimensions.find(d => d.id === id);
+    if (!dimension) return;
+
+    document.getElementById('dimensionId').value = dimension.id;
+    document.getElementById('dimensionNom').value = dimension.nom;
+    document.getElementById('dimensionLongueur').value = dimension.longueur;
+    document.getElementById('dimensionLargeur').value = dimension.largeur;
+    document.getElementById('dimensionHauteur').value = dimension.hauteur;
+    document.getElementById('dimensionFormTitle').textContent = 'Modifier la dimension';
+    document.getElementById('btnCancelDimension').style.display = 'inline-flex';
+}
+
+function cancelDimensionEdit() {
+    document.getElementById('dimensionId').value = '';
+    document.getElementById('dimensionNom').value = '';
+    document.getElementById('dimensionLongueur').value = '';
+    document.getElementById('dimensionLargeur').value = '';
+    document.getElementById('dimensionHauteur').value = '';
+    document.getElementById('dimensionFormTitle').textContent = 'Ajouter une dimension';
+    document.getElementById('btnCancelDimension').style.display = 'none';
+}
+
+async function saveDimension() {
+    const id = document.getElementById('dimensionId').value;
+    const nom = document.getElementById('dimensionNom').value.trim();
+    const longueur = parseFloat(document.getElementById('dimensionLongueur').value);
+    const largeur = parseFloat(document.getElementById('dimensionLargeur').value);
+    const hauteur = parseFloat(document.getElementById('dimensionHauteur').value);
+
+    if (!nom || !longueur || !largeur || !hauteur) {
+        alert('Veuillez remplir tous les champs');
+        return;
+    }
+
+    const data = { nom, longueur, largeur, hauteur, is_default: false };
+
+    try {
+        const url = id ? `${API_URL}/api/dimensions/${id}` : `${API_URL}/api/dimensions`;
+        const method = id ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            cancelDimensionEdit();
+            loadDimensions();
+            alert(id ? 'Dimension modifiée!' : 'Dimension créée!');
+        } else {
+            alert('Erreur lors de la sauvegarde');
+        }
+    } catch (error) {
+        console.error('Erreur sauvegarde dimension:', error);
+        alert('Erreur lors de la sauvegarde');
+    }
+}
+
+async function deleteDimension(id) {
+    if (!confirm('Supprimer cette dimension?')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/dimensions/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+            loadDimensions();
+            alert('Dimension supprimée');
+        }
+    } catch (error) {
+        console.error('Erreur suppression dimension:', error);
     }
 }
 

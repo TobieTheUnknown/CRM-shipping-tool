@@ -1130,6 +1130,52 @@ input[type="checkbox"] {
     gap: 12px;
 }
 
+/* Dimensions Table */
+.dimensions-list {
+    margin-bottom: 20px;
+}
+
+.dimensions-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 15px;
+}
+
+.dimensions-table th,
+.dimensions-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dimensions-table th {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.dimensions-table code {
+    background: var(--bg-secondary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-cyan);
+}
+
+.dimension-form {
+    background: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.dimension-form h4 {
+    margin: 0 0 15px 0;
+    color: var(--accent-cyan);
+    font-size: 14px;
+}
+
 /* Loading Spinner */
 .loading {
     display: inline-block;

@@ -260,12 +260,12 @@ app.get('/api/produits', (req, res) => {
 
 // Créer un nouveau produit
 app.post('/api/produits', (req, res) => {
-  const { nom, description, prix, poids, stock } = req.body;
+  const { nom, description, prix, poids, stock, dimension_id } = req.body;
 
   db.run(
-    `INSERT INTO produits (nom, description, prix, poids, stock)
-     VALUES (?, ?, ?, ?, ?)`,
-    [nom, description, prix, poids, stock || 0],
+    `INSERT INTO produits (nom, description, prix, poids, stock, dimension_id)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [nom, description, prix, poids, stock || 0, dimension_id || null],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -278,13 +278,13 @@ app.post('/api/produits', (req, res) => {
 
 // Mettre à jour un produit
 app.put('/api/produits/:id', (req, res) => {
-  const { nom, description, prix, poids, stock } = req.body;
+  const { nom, description, prix, poids, stock, dimension_id } = req.body;
 
   db.run(
     `UPDATE produits
-     SET nom=?, description=?, prix=?, poids=?, stock=?
+     SET nom=?, description=?, prix=?, poids=?, stock=?, dimension_id=?
      WHERE id=?`,
-    [nom, description, prix, poids, stock, req.params.id],
+    [nom, description, prix, poids, stock, dimension_id || null, req.params.id],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -703,6 +703,76 @@ app.post('/api/etiquettes/pdf', (req, res) => {
     });
 
     doc.end();
+  });
+});
+
+// ============= ROUTES DIMENSIONS =============
+
+// Récupérer toutes les dimensions
+app.get('/api/dimensions', (req, res) => {
+  db.all('SELECT * FROM dimensions ORDER BY longueur ASC', [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json(rows);
+  });
+});
+
+// Créer une nouvelle dimension
+app.post('/api/dimensions', (req, res) => {
+  const { nom, longueur, largeur, hauteur, is_default } = req.body;
+
+  db.run(
+    `INSERT INTO dimensions (nom, longueur, largeur, hauteur, is_default)
+     VALUES (?, ?, ?, ?, ?)`,
+    [nom, longueur, largeur, hauteur, is_default ? 1 : 0],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ id: this.lastID, message: 'Dimension créée avec succès' });
+    }
+  );
+});
+
+// Mettre à jour une dimension
+app.put('/api/dimensions/:id', (req, res) => {
+  const { nom, longueur, largeur, hauteur, is_default } = req.body;
+
+  db.run(
+    `UPDATE dimensions
+     SET nom=?, longueur=?, largeur=?, hauteur=?, is_default=?
+     WHERE id=?`,
+    [nom, longueur, largeur, hauteur, is_default ? 1 : 0, req.params.id],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ message: 'Dimension mise à jour', changes: this.changes });
+    }
+  );
+});
+
+// Supprimer une dimension
+app.delete('/api/dimensions/:id', (req, res) => {
+  // D'abord, retirer cette dimension des produits qui l'utilisent
+  db.run('UPDATE produits SET dimension_id = NULL WHERE dimension_id = ?', [req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+
+    // Ensuite supprimer la dimension
+    db.run('DELETE FROM dimensions WHERE id = ?', [req.params.id], function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ message: 'Dimension supprimée', changes: this.changes });
+    });
   });
 });
 

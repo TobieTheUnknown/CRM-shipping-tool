@@ -77,6 +77,49 @@
                     </div>
                 </div>
 
+                <!-- GESTION DES DIMENSIONS -->
+                <div class="database-tools">
+                    <h3>📐 Dimensions de cartons</h3>
+                    <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                        Gérez les dimensions de cartons disponibles pour vos colis
+                    </p>
+
+                    <div class="dimensions-list" id="dimensionsList">
+                        <!-- Liste des dimensions générée dynamiquement -->
+                    </div>
+
+                    <div class="dimension-form" id="dimensionForm">
+                        <h4 id="dimensionFormTitle">Ajouter une dimension</h4>
+                        <input type="hidden" id="dimensionId">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nom</label>
+                                <input type="text" id="dimensionNom" placeholder="Ex: Petit, Moyen...">
+                            </div>
+                            <div class="form-group">
+                                <label>Longueur (cm)</label>
+                                <input type="number" id="dimensionLongueur" step="0.1" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Largeur (cm)</label>
+                                <input type="number" id="dimensionLargeur" step="0.1" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Hauteur (cm)</label>
+                                <input type="number" id="dimensionHauteur" step="0.1" min="0">
+                            </div>
+                        </div>
+                        <div class="tools-buttons" style="margin-top: 15px;">
+                            <button class="btn btn-primary" onclick="saveDimension()">
+                                💾 Enregistrer
+                            </button>
+                            <button class="btn btn-secondary" onclick="cancelDimensionEdit()" id="btnCancelDimension" style="display: none;">
+                                Annuler
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- IMPORT CSV -->
                 <div class="database-tools">
                     <h3>📋 Import CSV</h3>
@@ -417,6 +460,13 @@
                         <input type="number" id="produitStock" value="0">
                     </div>
                 </div>
+                <div class="form-group">
+                    <label>Dimension par défaut (optionnel)</label>
+                    <select id="produitDimensionId">
+                        <option value="">Aucune dimension par défaut</option>
+                        <!-- Options générées dynamiquement -->
+                    </select>
+                </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modalProduit')">Annuler</button>
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
@@ -474,12 +524,8 @@
                 <div class="form-group">
                     <label>Dimensions</label>
                     <input type="text" id="colisDimensions" placeholder="Ex: 30x20x15cm">
-                    <div class="dimension-buttons">
-                        <button type="button" class="btn-dimension" onclick="setDimension('20x15x10')">20x15x10</button>
-                        <button type="button" class="btn-dimension" onclick="setDimension('30x20x15')">30x20x15</button>
-                        <button type="button" class="btn-dimension" onclick="setDimension('40x30x20')">40x30x20</button>
-                        <button type="button" class="btn-dimension" onclick="setDimension('50x40x30')">50x40x30</button>
-                        <button type="button" class="btn-dimension" onclick="setDimension('60x40x40')">60x40x40</button>
+                    <div class="dimension-buttons" id="dimensionButtons">
+                        <!-- Dimensions générées dynamiquement -->
                     </div>
                 </div>
 

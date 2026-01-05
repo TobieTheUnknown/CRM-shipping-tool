@@ -94,6 +94,41 @@ function initDatabase() {
     FOREIGN KEY (produit_id) REFERENCES produits (id)
   )`);
 
+  // Table Dimensions de cartons
+  db.run(`CREATE TABLE IF NOT EXISTS dimensions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    longueur REAL NOT NULL,
+    largeur REAL NOT NULL,
+    hauteur REAL NOT NULL,
+    is_default INTEGER DEFAULT 0,
+    date_creation DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Ajouter dimension_id aux produits pour lien optionnel
+  db.run(`ALTER TABLE produits ADD COLUMN dimension_id INTEGER REFERENCES dimensions(id)`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Erreur ajout colonne dimension_id:', err.message);
+    }
+  });
+
+  // Insérer les dimensions par défaut si la table est vide
+  db.get('SELECT COUNT(*) as count FROM dimensions', [], (err, row) => {
+    if (!err && row && row.count === 0) {
+      const defaultDimensions = [
+        ['Petit', 20, 15, 10, 1],
+        ['Moyen', 30, 20, 15, 1],
+        ['Grand', 40, 30, 20, 1],
+        ['Très grand', 50, 40, 30, 1],
+        ['Extra large', 60, 40, 40, 1]
+      ];
+      const stmt = db.prepare('INSERT INTO dimensions (nom, longueur, largeur, hauteur, is_default) VALUES (?, ?, ?, ?, ?)');
+      defaultDimensions.forEach(d => stmt.run(d));
+      stmt.finalize();
+      console.log('Dimensions par défaut créées.');
+    }
+  });
+
   console.log('Tables de base de données initialisées.');
 }
 
