@@ -369,11 +369,16 @@
                 <input type="hidden" id="colisId">
 
                 <div class="form-row">
-                    <div class="form-group">
+                    <div class="form-group" style="flex: 1;">
                         <label>Client *</label>
-                        <select id="colisClientId" required onchange="fillClientAddress()">
-                            <option value="">Sélectionner un client</option>
-                        </select>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="colisClientId" required onchange="fillClientAddress()" style="flex: 1;">
+                                <option value="">Sélectionner un client</option>
+                            </select>
+                            <button type="button" class="btn btn-secondary btn-small" onclick="showQuickClientModal()" title="Créer un client rapidement">
+                                ➕ Créer
+                            </button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>N° de Suivi</label>
@@ -448,6 +453,38 @@
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL CRÉATION RAPIDE CLIENT -->
+    <div id="modalQuickClient" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('modalQuickClient')">&times;</span>
+            <h2>Créer un Client Rapidement</h2>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
+                Collez les informations du client (nom, adresse, email, téléphone) et elles seront automatiquement reconnues.
+            </p>
+
+            <div class="form-group">
+                <label>Informations du client</label>
+                <textarea id="quickClientInput" rows="8" placeholder="Exemple:&#10;Marwane Khyar&#10;9 rue du docteur Roger galbrun&#10;77170 Brie comte robert, France&#10;Khyar.m@gmail.com&#10;0609519225" style="font-family: monospace; font-size: 13px;"></textarea>
+            </div>
+
+            <div style="text-align: center; margin: 15px 0;">
+                <button type="button" class="btn btn-primary" onclick="parseQuickClient()">
+                    🔍 Analyser et pré-remplir
+                </button>
+            </div>
+
+            <div id="parsedClientPreview" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                <h3 style="margin-top: 0; font-size: 14px; color: #666;">Aperçu des données détectées:</h3>
+                <div id="parsedClientData" style="font-size: 13px;"></div>
+
+                <div class="form-actions" style="margin-top: 15px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modalQuickClient')">Annuler</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmQuickClient()">✓ Créer ce client</button>
+                </div>
+            </div>
         </div>
     </div>
 

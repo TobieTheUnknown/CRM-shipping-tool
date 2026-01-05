@@ -308,6 +308,229 @@ function editClientFromDetails() {
     }
 }
 
+// ============= CRÉATION RAPIDE CLIENT =============
+
+let parsedClientData = null;
+
+function showQuickClientModal() {
+    document.getElementById('quickClientInput').value = '';
+    document.getElementById('parsedClientPreview').style.display = 'none';
+    parsedClientData = null;
+    document.getElementById('modalQuickClient').classList.add('active');
+}
+
+function parseQuickClient() {
+    const input = document.getElementById('quickClientInput').value.trim();
+
+    if (!input) {
+        alert('Veuillez entrer des informations');
+        return;
+    }
+
+    // Parser intelligent
+    const data = smartParseClientInfo(input);
+    parsedClientData = data;
+
+    // Afficher l'aperçu
+    const previewHtml = `
+        <div style="display: grid; gap: 8px;">
+            <div><strong>Nom:</strong> ${data.nom || '<em style="color: #999;">Non détecté</em>'}</div>
+            <div><strong>Prénom:</strong> ${data.prenom || '<em style="color: #999;">Non détecté</em>'}</div>
+            <div><strong>Email:</strong> ${data.email || '<em style="color: #999;">Non détecté</em>'}</div>
+            <div><strong>Téléphone:</strong> ${data.telephone || '<em style="color: #999;">Non détecté</em>'}</div>
+            <div><strong>Adresse:</strong> ${data.adresse || '<em style="color: #999;">Non détectée</em>'}</div>
+            <div><strong>Code Postal:</strong> ${data.code_postal || '<em style="color: #999;">Non détecté</em>'}</div>
+            <div><strong>Ville:</strong> ${data.ville || '<em style="color: #999;">Non détectée</em>'}</div>
+            <div><strong>Pays:</strong> ${data.pays || '<em style="color: #999;">France</em>'}</div>
+        </div>
+    `;
+
+    document.getElementById('parsedClientData').innerHTML = previewHtml;
+    document.getElementById('parsedClientPreview').style.display = 'block';
+}
+
+function smartParseClientInfo(text) {
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const data = {
+        nom: '',
+        prenom: '',
+        email: '',
+        telephone: '',
+        adresse: '',
+        code_postal: '',
+        ville: '',
+        pays: 'France'
+    };
+
+    // Regex patterns
+    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]{2,})/;
+    const phoneRegex = /(?:(?:\+|00)\d{1,3}[-.\s]?)?(?:\(?\d{1,4}\)?[-.\s]?)?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/;
+
+    // Postal code patterns - FR, CA, US, UK, etc.
+    const postalCodeRegex = /\b([A-Z]\d[A-Z]\s?\d[A-Z]\d|\d{5}(?:[-\s]\d{4})?|[A-Z]{1,2}\d{1,2}\s?\d[A-Z]{2}|[A-Z]\d{5})\b/i;
+
+    let usedLines = new Set();
+    let addressLines = [];
+
+    // 1. Extraire email
+    for (let i = 0; i < lines.length; i++) {
+        const emailMatch = lines[i].match(emailRegex);
+        if (emailMatch) {
+            data.email = emailMatch[1];
+            usedLines.add(i);
+            break;
+        }
+    }
+
+    // 2. Extraire téléphone
+    for (let i = 0; i < lines.length; i++) {
+        if (usedLines.has(i)) continue;
+
+        // Chercher des patterns de téléphone
+        const line = lines[i].toLowerCase();
+        if (line.includes('téléphone') || line.includes('telephone') || line.includes('tel') || line.includes('phone')) {
+            const phoneMatch = lines[i].match(phoneRegex);
+            if (phoneMatch) {
+                data.telephone = phoneMatch[0].replace(/[-.\s]/g, '');
+                usedLines.add(i);
+                continue;
+            }
+        }
+
+        // Téléphone standalone
+        if (!data.telephone) {
+            const phoneMatch = lines[i].match(phoneRegex);
+            if (phoneMatch && phoneMatch[0].replace(/\D/g, '').length >= 10) {
+                data.telephone = phoneMatch[0].replace(/[-.\s]/g, '');
+                usedLines.add(i);
+            }
+        }
+    }
+
+    // 3. Détecter la ligne avec code postal + ville + pays
+    let postalLineIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (usedLines.has(i)) continue;
+
+        const postalMatch = lines[i].match(postalCodeRegex);
+        if (postalMatch) {
+            postalLineIndex = i;
+            data.code_postal = postalMatch[1];
+
+            // Extraire ville et pays
+            let remaining = lines[i].replace(postalMatch[0], '').trim();
+
+            // Chercher le pays
+            const commonCountries = ['France', 'Canada', 'Belgique', 'Suisse', 'USA', 'United States', 'UK', 'England', 'Germany', 'Spain', 'Italy'];
+            for (const country of commonCountries) {
+                const countryRegex = new RegExp(country, 'i');
+                if (countryRegex.test(remaining)) {
+                    data.pays = country.charAt(0).toUpperCase() + country.slice(1).toLowerCase();
+                    remaining = remaining.replace(countryRegex, '').trim();
+                    break;
+                }
+            }
+
+            // Ce qui reste est la ville
+            data.ville = remaining.replace(/^[,\s]+|[,\s]+$/g, '').replace(/\s+/g, ' ');
+            usedLines.add(i);
+            break;
+        }
+    }
+
+    // 4. Nom et prénom (généralement la première ligne non utilisée)
+    let nameLineIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (usedLines.has(i)) continue;
+
+        const line = lines[i].toLowerCase();
+        // Éviter les lignes qui contiennent des mots-clés d'adresse
+        if (line.includes('adresse') || line.includes('mail') || line.includes('rue') ||
+            line.includes('avenue') || line.includes('boulevard')) {
+            continue;
+        }
+
+        // Prendre cette ligne comme nom
+        const nameParts = lines[i].split(/\s+/);
+        if (nameParts.length >= 2) {
+            data.prenom = nameParts[0];
+            data.nom = nameParts.slice(1).join(' ');
+        } else {
+            data.nom = lines[i];
+        }
+
+        nameLineIndex = i;
+        usedLines.add(i);
+        break;
+    }
+
+    // 5. Les lignes restantes sont l'adresse
+    for (let i = 0; i < lines.length; i++) {
+        if (usedLines.has(i)) continue;
+
+        const line = lines[i].toLowerCase();
+        // Ignorer les lignes de labels
+        if (line.startsWith('adresse postale') || line.startsWith('adresse mail') ||
+            line.startsWith('téléphone') || line.startsWith('telephone') ||
+            line.startsWith('email') || line.startsWith('mail')) {
+            continue;
+        }
+
+        addressLines.push(lines[i]);
+    }
+
+    data.adresse = addressLines.join(', ');
+
+    return data;
+}
+
+async function confirmQuickClient() {
+    if (!parsedClientData) {
+        alert('Veuillez d\'abord analyser les informations');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/clients`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                nom: parsedClientData.nom,
+                prenom: parsedClientData.prenom,
+                email: parsedClientData.email,
+                telephone: parsedClientData.telephone,
+                adresse: parsedClientData.adresse,
+                ville: parsedClientData.ville,
+                code_postal: parsedClientData.code_postal,
+                pays: parsedClientData.pays,
+                wallet: JSON.stringify([]),
+                lien: JSON.stringify([])
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+
+            // Recharger la liste des clients
+            await loadClients();
+
+            // Sélectionner le nouveau client dans le formulaire de colis
+            document.getElementById('colisClientId').value = result.id;
+
+            // Remplir l'adresse automatiquement
+            fillClientAddress();
+
+            closeModal('modalQuickClient');
+            alert('Client créé avec succès!');
+        } else {
+            alert('Erreur lors de la création du client');
+        }
+    } catch (error) {
+        console.error('Erreur création client:', error);
+        alert('Erreur lors de la création du client');
+    }
+}
+
 // ============= GESTION WALLETS/LIENS MULTIPLES =============
 
 let walletCounter = 0;
