@@ -308,6 +308,269 @@ function editClientFromDetails() {
     }
 }
 
+// ============= CRÉATION RAPIDE CLIENT =============
+
+let parsedClientData = null;
+
+function showQuickClientModal() {
+    document.getElementById('quickClientInput').value = '';
+    document.getElementById('parsedClientPreview').style.display = 'none';
+    parsedClientData = null;
+    document.getElementById('modalQuickClient').classList.add('active');
+}
+
+function parseQuickClient() {
+    const input = document.getElementById('quickClientInput').value.trim();
+
+    if (!input) {
+        alert('Veuillez entrer des informations');
+        return;
+    }
+
+    // Parser intelligent
+    const data = smartParseClientInfo(input);
+    parsedClientData = data;
+
+    // Afficher l'aperçu
+    const previewHtml = `
+        <div style="display: grid; gap: 8px;">
+            <div><strong>Nom:</strong> ${data.nom || '<em style="color: #999;">Non détecté</em>'}</div>
+            <div><strong>Prénom:</strong> ${data.prenom || '<em style="color: #999;">Non détecté</em>'}</div>
+            <div><strong>Email:</strong> ${data.email || '<em style="color: #999;">Non détecté</em>'}</div>
+            <div><strong>Téléphone:</strong> ${data.telephone || '<em style="color: #999;">Non détecté</em>'}</div>
+            <div><strong>Adresse:</strong> ${data.adresse || '<em style="color: #999;">Non détectée</em>'}</div>
+            <div><strong>Code Postal:</strong> ${data.code_postal || '<em style="color: #999;">Non détecté</em>'}</div>
+            <div><strong>Ville:</strong> ${data.ville || '<em style="color: #999;">Non détectée</em>'}</div>
+            <div><strong>Pays:</strong> ${data.pays || '<em style="color: #999;">France</em>'}</div>
+        </div>
+    `;
+
+    document.getElementById('parsedClientData').innerHTML = previewHtml;
+    document.getElementById('parsedClientPreview').style.display = 'block';
+}
+
+function smartParseClientInfo(text) {
+    // Nettoyer le texte : retirer les guillemets
+    text = text.replace(/["«»""]/g, '');
+
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const data = {
+        nom: '',
+        prenom: '',
+        email: '',
+        telephone: '',
+        adresse: '',
+        code_postal: '',
+        ville: '',
+        pays: 'France'
+    };
+
+    // Regex patterns
+    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]{2,})/;
+    const phoneRegex = /(?:(?:\+|00)\d{1,3}[-.\s]?)?(?:\(?\d{1,4}\)?[-.\s]?)?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/;
+
+    // Postal code patterns - FR, CA, US, UK, etc.
+    const postalCodeRegex = /\b([A-Z]\d[A-Z]\s?\d[A-Z]\d|\d{5}(?:[-\s]\d{4})?|[A-Z]{1,2}\d{1,2}\s?\d[A-Z]{2}|[A-Z]\d{5})\b/i;
+
+    let usedLines = new Set();
+    let addressLines = [];
+
+    // 1. Extraire email
+    for (let i = 0; i < lines.length; i++) {
+        const emailMatch = lines[i].match(emailRegex);
+        if (emailMatch) {
+            data.email = emailMatch[1];
+            usedLines.add(i);
+            break;
+        }
+    }
+
+    // 2. Extraire téléphone
+    for (let i = 0; i < lines.length; i++) {
+        if (usedLines.has(i)) continue;
+
+        // Chercher des patterns de téléphone
+        const line = lines[i].toLowerCase();
+        if (line.includes('téléphone') || line.includes('telephone') || line.includes('tel') || line.includes('phone')) {
+            const phoneMatch = lines[i].match(phoneRegex);
+            if (phoneMatch) {
+                data.telephone = phoneMatch[0].replace(/[-.\s]/g, '');
+                usedLines.add(i);
+                continue;
+            }
+        }
+
+        // Téléphone standalone
+        if (!data.telephone) {
+            const phoneMatch = lines[i].match(phoneRegex);
+            if (phoneMatch && phoneMatch[0].replace(/\D/g, '').length >= 10) {
+                data.telephone = phoneMatch[0].replace(/[-.\s]/g, '');
+                usedLines.add(i);
+            }
+        }
+    }
+
+    // 3. Détecter la ligne avec code postal + ville + pays
+    let postalLineIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (usedLines.has(i)) continue;
+
+        const postalMatch = lines[i].match(postalCodeRegex);
+        if (postalMatch) {
+            postalLineIndex = i;
+            data.code_postal = postalMatch[1];
+
+            // Extraire ville et pays
+            let remaining = lines[i].replace(postalMatch[0], '').trim();
+
+            // Chercher le pays
+            const commonCountries = ['France', 'Canada', 'Belgique', 'Suisse', 'USA', 'United States', 'UK', 'England', 'Germany', 'Spain', 'Italy'];
+            for (const country of commonCountries) {
+                const countryRegex = new RegExp(country, 'i');
+                if (countryRegex.test(remaining)) {
+                    data.pays = country.charAt(0).toUpperCase() + country.slice(1).toLowerCase();
+                    remaining = remaining.replace(countryRegex, '').trim();
+                    break;
+                }
+            }
+
+            // Ce qui reste est la ville
+            data.ville = remaining.replace(/^[,\s]+|[,\s]+$/g, '').replace(/\s+/g, ' ');
+            usedLines.add(i);
+            break;
+        }
+    }
+
+    // 4. Nom et prénom (généralement la première ligne non utilisée)
+    let nameLineIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (usedLines.has(i)) continue;
+
+        const line = lines[i].toLowerCase();
+        // Éviter les lignes qui contiennent des mots-clés d'adresse
+        if (line.includes('adresse') || line.includes('mail') || line.includes('rue') ||
+            line.includes('avenue') || line.includes('boulevard')) {
+            continue;
+        }
+
+        // Prendre cette ligne comme nom
+        const nameParts = lines[i].split(/\s+/);
+        if (nameParts.length >= 2) {
+            data.prenom = nameParts[0];
+            data.nom = nameParts.slice(1).join(' ');
+        } else {
+            data.nom = lines[i];
+        }
+
+        nameLineIndex = i;
+        usedLines.add(i);
+        break;
+    }
+
+    // 5. Les lignes restantes sont l'adresse
+    for (let i = 0; i < lines.length; i++) {
+        if (usedLines.has(i)) continue;
+
+        const line = lines[i].toLowerCase();
+        // Ignorer les lignes de labels
+        if (line.startsWith('adresse postale') || line.startsWith('adresse mail') ||
+            line.startsWith('téléphone') || line.startsWith('telephone') ||
+            line.startsWith('email') || line.startsWith('mail')) {
+            continue;
+        }
+
+        addressLines.push(lines[i]);
+    }
+
+    data.adresse = addressLines.join(', ');
+
+    return data;
+}
+
+async function confirmQuickClient() {
+    if (!parsedClientData) {
+        alert('Veuillez d\'abord analyser les informations');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/clients`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                nom: parsedClientData.nom,
+                prenom: parsedClientData.prenom,
+                email: parsedClientData.email,
+                telephone: parsedClientData.telephone,
+                adresse: parsedClientData.adresse,
+                ville: parsedClientData.ville,
+                code_postal: parsedClientData.code_postal,
+                pays: parsedClientData.pays,
+                wallet: JSON.stringify([]),
+                lien: JSON.stringify([])
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+
+            // Recharger la liste des clients
+            await loadClients();
+
+            // Sélectionner le nouveau client dans le formulaire de colis
+            document.getElementById('colisClientId').value = result.id;
+
+            // Remplir l'adresse automatiquement
+            fillClientAddress();
+
+            closeModal('modalQuickClient');
+            alert('Client créé avec succès!');
+        } else {
+            alert('Erreur lors de la création du client');
+        }
+    } catch (error) {
+        console.error('Erreur création client:', error);
+        alert('Erreur lors de la création du client');
+    }
+}
+
+function toggleQuickFillClient() {
+    const section = document.getElementById('quickFillClientSection');
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+    } else {
+        section.style.display = 'none';
+    }
+}
+
+function parseAndFillClientForm() {
+    const input = document.getElementById('quickFillClientInput').value.trim();
+
+    if (!input) {
+        alert('Veuillez entrer des informations');
+        return;
+    }
+
+    // Parser les infos
+    const data = smartParseClientInfo(input);
+
+    // Remplir le formulaire
+    document.getElementById('clientNom').value = data.nom || '';
+    document.getElementById('clientPrenom').value = data.prenom || '';
+    document.getElementById('clientEmail').value = data.email || '';
+    document.getElementById('clientTelephone').value = data.telephone || '';
+    document.getElementById('clientAdresse').value = data.adresse || '';
+    document.getElementById('clientVille').value = data.ville || '';
+    document.getElementById('clientCodePostal').value = data.code_postal || '';
+    document.getElementById('clientPays').value = data.pays || 'France';
+
+    // Vider le textarea et cacher la section
+    document.getElementById('quickFillClientInput').value = '';
+    document.getElementById('quickFillClientSection').style.display = 'none';
+
+    alert('✅ Champs remplis automatiquement ! Vérifiez et complétez si nécessaire.');
+}
+
 // ============= GESTION WALLETS/LIENS MULTIPLES =============
 
 let walletCounter = 0;
@@ -740,6 +1003,19 @@ async function imprimerEtiquettesSelection() {
         return;
     }
 
+    // Demander AVANT la génération si l'utilisateur veut marquer comme expédiés
+    const nombreColis = selectedColis.size;
+    const messageConfirm = nombreColis === 1
+        ? 'Voulez-vous passer ce colis en "Expédié" ?'
+        : `Voulez-vous passer ces ${nombreColis} colis en "Expédié" ?`;
+
+    const marquerExpedies = confirm(messageConfirm);
+
+    // Si oui, marquer comme expédiés AVANT de générer le PDF
+    if (marquerExpedies) {
+        await marquerColisExpedies(Array.from(selectedColis));
+    }
+
     try {
         // Récupérer le logo depuis localStorage
         const logoData = localStorage.getItem('shippingLogo');
@@ -764,13 +1040,60 @@ async function imprimerEtiquettesSelection() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
-            alert(`${selectedColis.size} étiquette(s) générée(s) avec succès!\n\nFormat: 6 étiquettes par page (2x3)`);
+            // Pas d'alerte de succès - le téléchargement du PDF est suffisant
         } else {
             alert('Erreur lors de la génération du PDF');
         }
     } catch (error) {
         console.error('Erreur impression étiquettes:', error);
         alert('Erreur lors de l\'impression');
+    }
+}
+
+async function marquerColisExpedies(colisIds) {
+    try {
+        // Mettre à jour chaque colis
+        for (const colisId of colisIds) {
+            // Trouver le colis dans le tableau
+            const colisData = colis.find(c => c.id === colisId);
+            if (!colisData) continue;
+
+            // Préparer les données de mise à jour avec le nouveau statut
+            const updateData = {
+                client_id: colisData.client_id,
+                numero_suivi: colisData.numero_suivi,
+                statut: 'Expédié',
+                poids: colisData.poids,
+                dimensions: colisData.dimensions,
+                reference: colisData.reference,
+                adresse_expedition: colisData.adresse_expedition,
+                adresse_ligne2: colisData.adresse_ligne2,
+                ville_expedition: colisData.ville_expedition,
+                code_postal_expedition: colisData.code_postal_expedition,
+                pays_expedition: colisData.pays_expedition,
+                date_expedition: new Date().toISOString().split('T')[0],
+                date_livraison: colisData.date_livraison,
+                notes: colisData.notes
+            };
+
+            // Mettre à jour le colis
+            await fetch(`${API_URL}/api/colis/${colisId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            });
+        }
+
+        // Recharger la liste des colis et les stats
+        await loadColis();
+        await loadStats();
+
+        // Désélectionner tous les colis
+        selectedColis.clear();
+        updateSelectionUI();
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour des statuts:', error);
+        alert('Erreur lors de la mise à jour du statut des colis');
     }
 }
 
