@@ -65,6 +65,7 @@ function initDatabase() {
   });
 
   // Ajouter les colonnes wallet et lien aux clients (pour migration)
+  // Ces colonnes stockent des données JSON pour permettre plusieurs entrées
   db.run(`ALTER TABLE clients ADD COLUMN wallet TEXT`, (err) => {
     if (err && !err.message.includes('duplicate column')) {
       console.error('Erreur ajout colonne wallet:', err.message);
@@ -74,6 +75,13 @@ function initDatabase() {
   db.run(`ALTER TABLE clients ADD COLUMN lien TEXT`, (err) => {
     if (err && !err.message.includes('duplicate column')) {
       console.error('Erreur ajout colonne lien:', err.message);
+    }
+  });
+
+  // Ajouter ligne d'adresse supplémentaire pour les colis
+  db.run(`ALTER TABLE colis ADD COLUMN adresse_ligne2 TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Erreur ajout colonne adresse_ligne2:', err.message);
     }
   });
   // Table Produits dans Colis (relation many-to-many)

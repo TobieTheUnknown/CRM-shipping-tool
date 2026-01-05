@@ -288,14 +288,18 @@
                     <label>Pays</label>
                     <input type="text" id="clientPays" value="France">
                 </div>
-                <div class="form-group">
-                    <label>Wallet</label>
-                    <input type="text" id="clientWallet" placeholder="Adresse wallet">
+
+                <h3>Wallets</h3>
+                <div id="walletsContainer">
+                    <!-- Les champs wallets seront ajoutés dynamiquement -->
                 </div>
-                <div class="form-group">
-                    <label>Lien profil externe</label>
-                    <input type="url" id="clientLien" placeholder="https://...">
+                <button type="button" class="btn btn-secondary btn-small" onclick="addWalletField()">+ Ajouter un wallet</button>
+
+                <h3 style="margin-top: 20px;">Liens externes</h3>
+                <div id="liensContainer">
+                    <!-- Les champs liens seront ajoutés dynamiquement -->
                 </div>
+                <button type="button" class="btn btn-secondary btn-small" onclick="addLienField()">+ Ajouter un lien</button>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modalClient')">Annuler</button>
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
@@ -412,8 +416,12 @@
 
                 <h3>Adresse d'expédition</h3>
                 <div class="form-group">
-                    <label>Adresse</label>
+                    <label>Adresse (ligne 1)</label>
                     <input type="text" id="colisAdresse">
+                </div>
+                <div class="form-group">
+                    <label>Adresse (ligne 2 - optionnel)</label>
+                    <input type="text" id="colisAdresseLigne2" placeholder="Bâtiment, étage, complément...">
                 </div>
                 <div class="form-row">
                     <div class="form-group">

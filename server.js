@@ -373,7 +373,7 @@ app.get('/api/colis/:id', (req, res) => {
 app.post('/api/colis', (req, res) => {
   const {
     numero_suivi, client_id, statut, poids, dimensions, reference,
-    adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
+    adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
     notes, produits
   } = req.body;
 
@@ -382,11 +382,11 @@ app.post('/api/colis', (req, res) => {
 
   db.run(
     `INSERT INTO colis (numero_suivi, client_id, statut, poids, dimensions, reference,
-                        adresse_expedition, ville_expedition, code_postal_expedition,
+                        adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition,
                         pays_expedition, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [tracking, client_id, statut || 'En préparation', poids, dimensions, reference,
-     adresse_expedition, ville_expedition, code_postal_expedition,
+     adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition,
      pays_expedition || 'France', notes],
     function(err) {
       if (err) {
@@ -416,18 +416,18 @@ app.post('/api/colis', (req, res) => {
 app.put('/api/colis/:id', (req, res) => {
   const {
     numero_suivi, statut, poids, dimensions, reference,
-    adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
+    adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
     date_expedition, date_livraison, notes
   } = req.body;
 
   db.run(
     `UPDATE colis
      SET numero_suivi=?, statut=?, poids=?, dimensions=?, reference=?,
-         adresse_expedition=?, ville_expedition=?, code_postal_expedition=?, pays_expedition=?,
+         adresse_expedition=?, adresse_ligne2=?, ville_expedition=?, code_postal_expedition=?, pays_expedition=?,
          date_expedition=?, date_livraison=?, notes=?
      WHERE id=?`,
     [numero_suivi, statut, poids, dimensions, reference,
-     adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
+     adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
      date_expedition, date_livraison, notes, req.params.id],
     function(err) {
       if (err) {
@@ -556,14 +556,27 @@ app.post('/api/etiquettes/pdf', (req, res) => {
       );
       currentY += 12;
 
-      // Adresse
+      // Adresse (ligne 1)
       doc.fontSize(8).font('Helvetica').text(
         colis.adresse_expedition || colis.client_adresse || '',
         startX + margin,
         currentY,
         { width: labelWidth - 2 * margin }
       );
-      currentY += 20;
+      currentY += 10;
+
+      // Adresse (ligne 2) - si présente
+      if (colis.adresse_ligne2) {
+        doc.text(
+          colis.adresse_ligne2,
+          startX + margin,
+          currentY,
+          { width: labelWidth - 2 * margin }
+        );
+        currentY += 10;
+      } else {
+        currentY += 10;
+      }
 
       // Code postal + Ville
       doc.text(

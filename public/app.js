@@ -96,6 +96,10 @@ function updateClientSelect() {
 function showAddClientModal() {
     document.getElementById('formClient').reset();
     document.getElementById('clientId').value = '';
+    clearWalletsAndLiens();
+    // Ajouter au moins un champ vide pour chaque
+    addWalletField();
+    addLienField();
     document.getElementById('modalClient').classList.add('active');
 }
 
@@ -112,8 +116,44 @@ function editClient(id) {
     document.getElementById('clientVille').value = client.ville || '';
     document.getElementById('clientCodePostal').value = client.code_postal || '';
     document.getElementById('clientPays').value = client.pays || 'France';
-    document.getElementById('clientWallet').value = client.wallet || '';
-    document.getElementById('clientLien').value = client.lien || '';
+
+    // Charger les wallets et liens multiples
+    clearWalletsAndLiens();
+
+    // Parser les wallets (stockés en JSON)
+    let wallets = [];
+    try {
+        if (client.wallet) {
+            wallets = JSON.parse(client.wallet);
+            if (!Array.isArray(wallets)) wallets = [client.wallet];
+        }
+    } catch (e) {
+        if (client.wallet) wallets = [client.wallet];
+    }
+
+    // Parser les liens (stockés en JSON)
+    let liens = [];
+    try {
+        if (client.lien) {
+            liens = JSON.parse(client.lien);
+            if (!Array.isArray(liens)) liens = [client.lien];
+        }
+    } catch (e) {
+        if (client.lien) liens = [client.lien];
+    }
+
+    // Ajouter les champs
+    if (wallets.length > 0) {
+        wallets.forEach(w => addWalletField(w));
+    } else {
+        addWalletField();
+    }
+
+    if (liens.length > 0) {
+        liens.forEach(l => addLienField(l));
+    } else {
+        addLienField();
+    }
 
     document.getElementById('modalClient').classList.add('active');
 }
@@ -122,6 +162,11 @@ async function saveClient(event) {
     event.preventDefault();
 
     const id = document.getElementById('clientId').value;
+
+    // Récupérer les wallets et liens multiples
+    const wallets = getWalletsFromForm();
+    const liens = getLiensFromForm();
+
     const data = {
         nom: document.getElementById('clientNom').value,
         prenom: document.getElementById('clientPrenom').value,
@@ -131,8 +176,8 @@ async function saveClient(event) {
         ville: document.getElementById('clientVille').value,
         code_postal: document.getElementById('clientCodePostal').value,
         pays: document.getElementById('clientPays').value,
-        wallet: document.getElementById('clientWallet').value,
-        lien: document.getElementById('clientLien').value
+        wallet: JSON.stringify(wallets),
+        lien: JSON.stringify(liens)
     };
 
     try {
@@ -182,6 +227,43 @@ async function viewClientDetails(clientId) {
             return;
         }
 
+        // Parser les wallets et liens
+        let wallets = [];
+        try {
+            if (client.wallet) {
+                wallets = JSON.parse(client.wallet);
+                if (!Array.isArray(wallets)) wallets = [client.wallet];
+            }
+        } catch (e) {
+            if (client.wallet) wallets = [client.wallet];
+        }
+
+        let liens = [];
+        try {
+            if (client.lien) {
+                liens = JSON.parse(client.lien);
+                if (!Array.isArray(liens)) liens = [client.lien];
+            }
+        } catch (e) {
+            if (client.lien) liens = [client.lien];
+        }
+
+        // Générer le HTML pour les wallets
+        const walletsHtml = wallets.length > 0 ? `
+            <div>
+                <strong>Wallets:</strong><br>
+                ${wallets.map(w => `<code style="background: #f0f0f0; padding: 5px; border-radius: 3px; display: block; margin-top: 5px; word-break: break-all;">${w}</code>`).join('')}
+            </div>
+        ` : '';
+
+        // Générer le HTML pour les liens
+        const liensHtml = liens.length > 0 ? `
+            <div>
+                <strong>Profils externes:</strong><br>
+                ${liens.map(l => `<a href="${l}" target="_blank" class="product-link" style="display: block; margin-top: 5px;">${l}</a>`).join('')}
+            </div>
+        ` : '';
+
         const detailsHtml = `
             <div style="display: grid; gap: 15px;">
                 <div>
@@ -202,18 +284,8 @@ async function viewClientDetails(clientId) {
                     ${client.code_postal || ''} ${client.ville || ''}<br>
                     ${client.pays || 'France'}
                 </div>
-                ${client.wallet ? `
-                <div>
-                    <strong>Wallet:</strong><br>
-                    <code style="background: #f0f0f0; padding: 5px; border-radius: 3px; display: inline-block; word-break: break-all;">${client.wallet}</code>
-                </div>
-                ` : ''}
-                ${client.lien ? `
-                <div>
-                    <strong>Profil externe:</strong><br>
-                    <a href="${client.lien}" target="_blank" class="product-link">${client.lien}</a>
-                </div>
-                ` : ''}
+                ${walletsHtml}
+                ${liensHtml}
             </div>
         `;
 
@@ -234,6 +306,75 @@ function editClientFromDetails() {
         closeModal('modalClientDetails');
         editClient(window.currentClientDetailsId);
     }
+}
+
+// ============= GESTION WALLETS/LIENS MULTIPLES =============
+
+let walletCounter = 0;
+let lienCounter = 0;
+
+function addWalletField(value = '') {
+    const container = document.getElementById('walletsContainer');
+    const id = `wallet_${walletCounter++}`;
+
+    const div = document.createElement('div');
+    div.className = 'form-group';
+    div.id = `container_${id}`;
+    div.innerHTML = `
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" class="wallet-input" id="${id}" placeholder="Adresse wallet" value="${value}" style="flex: 1;">
+            <button type="button" class="btn btn-danger btn-small" onclick="removeField('container_${id}')">🗑️</button>
+        </div>
+    `;
+    container.appendChild(div);
+}
+
+function addLienField(value = '') {
+    const container = document.getElementById('liensContainer');
+    const id = `lien_${lienCounter++}`;
+
+    const div = document.createElement('div');
+    div.className = 'form-group';
+    div.id = `container_${id}`;
+    div.innerHTML = `
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="url" class="lien-input" id="${id}" placeholder="https://..." value="${value}" style="flex: 1;">
+            <button type="button" class="btn btn-danger btn-small" onclick="removeField('container_${id}')">🗑️</button>
+        </div>
+    `;
+    container.appendChild(div);
+}
+
+function removeField(containerId) {
+    const element = document.getElementById(containerId);
+    if (element) {
+        element.remove();
+    }
+}
+
+function clearWalletsAndLiens() {
+    document.getElementById('walletsContainer').innerHTML = '';
+    document.getElementById('liensContainer').innerHTML = '';
+    walletCounter = 0;
+    lienCounter = 0;
+}
+
+function getWalletsFromForm() {
+    const wallets = [];
+    document.querySelectorAll('.wallet-input').forEach(input => {
+        const value = input.value.trim();
+        if (value) wallets.push(value);
+    });
+    return wallets;
+}
+
+function getLiensFromForm() {
+    const liens = [];
+    document.querySelectorAll('.lien-input').forEach(input => {
+        const value = input.value.trim();
+        if (value) liens.push(value);
+    });
+    return liens;
 }
 
 // ============= PRODUITS =============
@@ -487,6 +628,7 @@ function editColis(id) {
     document.getElementById('colisDimensions').value = c.dimensions || '';
     document.getElementById('colisReference').value = c.reference || '';
     document.getElementById('colisAdresse').value = c.adresse_expedition || '';
+    document.getElementById('colisAdresseLigne2').value = c.adresse_ligne2 || '';
     document.getElementById('colisVille').value = c.ville_expedition || '';
     document.getElementById('colisCodePostal').value = c.code_postal_expedition || '';
     document.getElementById('colisPays').value = c.pays_expedition || 'France';
@@ -507,6 +649,7 @@ async function saveColis(event) {
         dimensions: document.getElementById('colisDimensions').value,
         reference: document.getElementById('colisReference').value,
         adresse_expedition: document.getElementById('colisAdresse').value,
+        adresse_ligne2: document.getElementById('colisAdresseLigne2').value,
         ville_expedition: document.getElementById('colisVille').value,
         code_postal_expedition: document.getElementById('colisCodePostal').value,
         pays_expedition: document.getElementById('colisPays').value,
