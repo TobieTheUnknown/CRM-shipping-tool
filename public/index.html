@@ -31,112 +31,14 @@
         </header>
 
         <nav class="tabs">
-            <button class="tab-btn active" data-tab="planning">Planning</button>
-            <button class="tab-btn" data-tab="colis">Colis</button>
+            <button class="tab-btn active" data-tab="colis">Colis</button>
             <button class="tab-btn" data-tab="clients">Clients</button>
             <button class="tab-btn" data-tab="produits">Produits</button>
+            <button class="tab-btn" data-tab="settings">⚙️ Paramètres</button>
         </nav>
 
-        <!-- TAB PLANNING -->
-        <div id="tab-planning" class="tab-content active">
-            <div class="planning-header">
-                <h2>📋 Import CSV Planning</h2>
-                <p>Importez vos colis en masse via un fichier CSV</p>
-            </div>
-
-            <div class="csv-upload-section">
-                <div class="upload-card">
-                    <div class="upload-icon">📄</div>
-                    <h3>Format CSV attendu</h3>
-                    <p>Colonnes requises :</p>
-                    <ul class="csv-columns">
-                        <li><strong>Item</strong> - Nom de l'article</li>
-                        <li><strong>Lien</strong> - Lien vers l'article</li>
-                        <li><strong>Prix Objet (€)</strong> - Prix en euros</li>
-                        <li><strong>Poids (kg)</strong> - Poids du colis</li>
-                        <li><strong>Adresse d'envoi</strong> - Adresse complète</li>
-                        <li><strong>Lien de suivi colis</strong> - Numéro de suivi</li>
-                        <li><strong>Photos/Vidéos associées</strong> - Liens médias</li>
-                        <li><strong>Statut</strong> - État du colis</li>
-                        <li><strong>Timestamp</strong> - Date de création</li>
-                        <li><strong>N° Colis/mois</strong> - Référence</li>
-                        <li><strong>Note</strong> - Notes additionnelles</li>
-                    </ul>
-                </div>
-
-                <div class="upload-card">
-                    <h3>📤 Importer votre fichier</h3>
-                    <form id="csvUploadForm" onsubmit="uploadCSV(event)">
-                        <div class="file-input-wrapper">
-                            <input type="file" id="csvFile" accept=".csv" required>
-                            <label for="csvFile" class="file-label">
-                                <span id="fileNameDisplay">Choisir un fichier CSV...</span>
-                            </label>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-large" id="uploadBtn">
-                            ⬆️ Importer le CSV
-                        </button>
-                    </form>
-
-                    <div id="importResult" class="import-result" style="display: none;">
-                        <h4>Résultat de l'import</h4>
-                        <div id="importResultContent"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="csv-example">
-                <h3>📝 Exemple de fichier CSV</h3>
-                <button class="btn btn-secondary" onclick="downloadExampleCSV()">
-                    💾 Télécharger un modèle CSV
-                </button>
-            </div>
-
-            <!-- CONFIGURATION LOGO -->
-            <div class="database-tools">
-                <h3>🖼️ Configuration Logo pour Étiquettes</h3>
-                <p style="text-align: center; color: #666; margin-bottom: 15px;">
-                    Logo affiché sur les étiquettes d'expédition (format horizontal recommandé)
-                </p>
-                <div class="logo-upload-section">
-                    <div id="logoPreview" class="logo-preview">
-                        <img id="logoImage" src="" alt="Logo" style="display: none; max-width: 100%; max-height: 80px;">
-                        <p id="logoPlaceholder">Aucun logo configuré</p>
-                    </div>
-                    <div class="logo-actions">
-                        <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/jpg" style="display: none;" onchange="uploadLogo()">
-                        <button class="btn btn-primary" onclick="document.getElementById('logoFileInput').click()">
-                            📤 Choisir un logo
-                        </button>
-                        <button class="btn btn-danger" onclick="removeLogo()" id="btnRemoveLogo" style="display: none;">
-                            🗑️ Supprimer le logo
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- OUTILS BASE DE DONNÉES -->
-            <div class="database-tools">
-                <h3>🛠️ Outils de base de données</h3>
-                <div class="tools-buttons">
-                    <button class="btn btn-success" onclick="initTestData()">
-                        🎲 Charger des données de test
-                    </button>
-                    <button class="btn btn-secondary" onclick="exportDatabase()">
-                        💾 Exporter la base de données
-                    </button>
-                    <button class="btn btn-danger" onclick="resetDatabase()">
-                        🗑️ Réinitialiser la base de données
-                    </button>
-                </div>
-                <div id="dbToolsResult" class="import-result" style="display: none;">
-                    <div id="dbToolsResultContent"></div>
-                </div>
-            </div>
-        </div>
-
         <!-- TAB COLIS -->
-        <div id="tab-colis" class="tab-content">
+        <div id="tab-colis" class="tab-content active">
             <div class="actions-bar">
                 <button class="btn btn-primary" onclick="showAddColisModal()">+ Nouveau Colis</button>
                 <button class="btn btn-success" onclick="imprimerEtiquettesSelection()" id="btnImprimerSelection" disabled>
@@ -243,6 +145,124 @@
                         <tr><td colspan="6" class="empty">Aucun produit</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- TAB SETTINGS -->
+        <div id="tab-settings" class="tab-content">
+            <div class="settings-header">
+                <h2>⚙️ Paramètres</h2>
+                <p>Configuration et gestion des données</p>
+            </div>
+
+            <!-- CONFIGURATION LOGO -->
+            <div class="database-tools">
+                <h3>🖼️ Logo pour Étiquettes</h3>
+                <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                    Logo affiché sur les étiquettes d'expédition (format horizontal recommandé)
+                </p>
+                <div class="logo-upload-section">
+                    <div id="logoPreview" class="logo-preview">
+                        <img id="logoImage" src="" alt="Logo" style="display: none; max-width: 100%; max-height: 80px;">
+                        <p id="logoPlaceholder">Aucun logo configuré</p>
+                    </div>
+                    <div class="logo-actions">
+                        <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/jpg" style="display: none;" onchange="uploadLogo()">
+                        <button class="btn btn-primary" onclick="document.getElementById('logoFileInput').click()">
+                            📤 Choisir un logo
+                        </button>
+                        <button class="btn btn-danger" onclick="removeLogo()" id="btnRemoveLogo" style="display: none;">
+                            🗑️ Supprimer le logo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- IMPORT CSV -->
+            <div class="database-tools">
+                <h3>📋 Import CSV</h3>
+                <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                    Importez vos colis en masse via un fichier CSV
+                </p>
+
+                <div class="csv-upload-section">
+                    <div class="upload-card">
+                        <div class="upload-icon">📄</div>
+                        <h4>Format CSV attendu</h4>
+                        <p>Colonnes requises :</p>
+                        <ul class="csv-columns">
+                            <li><strong>Item</strong> - Nom de l'article</li>
+                            <li><strong>Lien</strong> - Lien vers l'article</li>
+                            <li><strong>Prix Objet (€)</strong> - Prix en euros</li>
+                            <li><strong>Poids (kg)</strong> - Poids du colis</li>
+                            <li><strong>Adresse d'envoi</strong> - Adresse complète</li>
+                            <li><strong>Lien de suivi colis</strong> - Numéro de suivi</li>
+                            <li><strong>Photos/Vidéos associées</strong> - Liens médias</li>
+                            <li><strong>Statut</strong> - État du colis</li>
+                            <li><strong>Timestamp</strong> - Date de création</li>
+                            <li><strong>N° Colis/mois</strong> - Référence</li>
+                            <li><strong>Note</strong> - Notes additionnelles</li>
+                        </ul>
+                    </div>
+
+                    <div class="upload-card">
+                        <h4>📤 Importer votre fichier</h4>
+                        <form id="csvUploadForm" onsubmit="uploadCSV(event)">
+                            <div class="file-input-wrapper">
+                                <input type="file" id="csvFile" accept=".csv" required>
+                                <label for="csvFile" class="file-label">
+                                    <span id="fileNameDisplay">Choisir un fichier CSV...</span>
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-large" id="uploadBtn">
+                                ⬆️ Importer le CSV
+                            </button>
+                        </form>
+
+                        <div id="importResult" class="import-result" style="display: none;">
+                            <h4>Résultat de l'import</h4>
+                            <div id="importResultContent"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="csv-example">
+                    <button class="btn btn-secondary" onclick="downloadExampleCSV()">
+                        💾 Télécharger un modèle CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- EXPORT/IMPORT DONNÉES -->
+            <div class="database-tools">
+                <h3>💾 Export / Import de données</h3>
+                <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                    Exportez ou importez l'ensemble de vos données (clients, produits, colis)
+                </p>
+                <div class="tools-buttons">
+                    <button class="btn btn-success" onclick="exportDatabase()">
+                        💾 Exporter toutes les données
+                    </button>
+                    <button class="btn btn-secondary" onclick="alert('Fonctionnalité à venir')">
+                        📥 Importer des données
+                    </button>
+                </div>
+            </div>
+
+            <!-- OUTILS BASE DE DONNÉES -->
+            <div class="database-tools">
+                <h3>🛠️ Outils de base de données</h3>
+                <div class="tools-buttons">
+                    <button class="btn btn-success" onclick="initTestData()">
+                        🎲 Charger des données de test
+                    </button>
+                    <button class="btn btn-danger" onclick="resetDatabase()">
+                        🗑️ Réinitialiser la base de données
+                    </button>
+                </div>
+                <div id="dbToolsResult" class="import-result" style="display: none;">
+                    <div id="dbToolsResultContent"></div>
+                </div>
             </div>
         </div>
     </div>
