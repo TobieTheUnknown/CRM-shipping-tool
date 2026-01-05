@@ -213,6 +213,38 @@ body::before {
     text-align: center;
 }
 
+/* Navigation Badge */
+.nav-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 8px;
+    background: var(--accent-cyan);
+    color: #000;
+    border-radius: 12px;
+    margin-left: auto;
+}
+
+.nav-item:hover .nav-badge {
+    background: var(--accent-green);
+}
+
+.nav-item.active .nav-badge {
+    background: var(--accent-cyan);
+    box-shadow: 0 0 10px rgba(0, 217, 255, 0.4);
+}
+
+/* Navigation Bottom (Settings) */
+.nav-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 20px 0;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
 /* =============== MAIN CONTENT =============== */
 .main-content {
     margin-left: 280px;
@@ -579,6 +611,37 @@ tbody tr:last-child td {
 
 .badge-livre::before {
     background: var(--status-delivered);
+}
+
+/* New Status Badges */
+.badge-outofstock {
+    background: rgba(248, 113, 113, 0.15);
+    color: var(--accent-red);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.badge-outofstock::before {
+    background: var(--accent-red);
+}
+
+.badge-envoye {
+    background: rgba(0, 255, 136, 0.15);
+    color: var(--accent-green);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.badge-envoye::before {
+    background: var(--accent-green);
+}
+
+.badge-incomplet {
+    background: rgba(251, 146, 60, 0.15);
+    color: var(--accent-orange);
+    border: 1px solid rgba(251, 146, 60, 0.3);
+}
+
+.badge-incomplet::before {
+    background: var(--accent-orange);
 }
 
 /* Modal */
@@ -1065,6 +1128,52 @@ input[type="checkbox"] {
 .logo-actions {
     display: flex;
     gap: 12px;
+}
+
+/* Dimensions Table */
+.dimensions-list {
+    margin-bottom: 20px;
+}
+
+.dimensions-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 15px;
+}
+
+.dimensions-table th,
+.dimensions-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dimensions-table th {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.dimensions-table code {
+    background: var(--bg-secondary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-cyan);
+}
+
+.dimension-form {
+    background: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.dimension-form h4 {
+    margin: 0 0 15px 0;
+    color: var(--accent-cyan);
+    font-size: 14px;
 }
 
 /* Loading Spinner */

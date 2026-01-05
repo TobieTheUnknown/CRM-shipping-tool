@@ -18,39 +18,29 @@
                 <div class="logo-subtitle">Logistics CRM</div>
             </div>
 
-            <div class="stats-sidebar">
-                <div class="stat-mini">
-                    <span class="stat-mini-label">Clients</span>
-                    <span class="stat-mini-value" id="statClientsSidebar">0</span>
-                </div>
-                <div class="stat-mini">
-                    <span class="stat-mini-label">Colis actifs</span>
-                    <span class="stat-mini-value" id="statColisSidebar">0</span>
-                </div>
-                <div class="stat-mini">
-                    <span class="stat-mini-label">En préparation</span>
-                    <span class="stat-mini-value" id="statPrepSidebar">0</span>
-                </div>
-            </div>
-
             <nav class="nav">
                 <div class="nav-item active" data-tab="colis">
                     <span class="nav-icon">📦</span>
-                    <span>Colis</span>
+                    <span>Colis en préparation</span>
+                    <span class="nav-badge" id="statPrepSidebar">0</span>
                 </div>
                 <div class="nav-item" data-tab="clients">
                     <span class="nav-icon">👥</span>
                     <span>Clients</span>
+                    <span class="nav-badge" id="statClientsSidebar">0</span>
                 </div>
                 <div class="nav-item" data-tab="produits">
                     <span class="nav-icon">🏷️</span>
                     <span>Produits</span>
                 </div>
+            </nav>
+
+            <div class="nav-bottom">
                 <div class="nav-item" data-tab="settings">
                     <span class="nav-icon">⚙️</span>
                     <span>Paramètres</span>
                 </div>
-            </nav>
+            </div>
         </aside>
 
         <!-- MAIN CONTENT -->
@@ -82,6 +72,49 @@
                             </button>
                             <button class="btn btn-danger" onclick="removeLogo()" id="btnRemoveLogo" style="display: none;">
                                 🗑️ Supprimer le logo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GESTION DES DIMENSIONS -->
+                <div class="database-tools">
+                    <h3>📐 Dimensions de cartons</h3>
+                    <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                        Gérez les dimensions de cartons disponibles pour vos colis
+                    </p>
+
+                    <div class="dimensions-list" id="dimensionsList">
+                        <!-- Liste des dimensions générée dynamiquement -->
+                    </div>
+
+                    <div class="dimension-form" id="dimensionForm">
+                        <h4 id="dimensionFormTitle">Ajouter une dimension</h4>
+                        <input type="hidden" id="dimensionId">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nom</label>
+                                <input type="text" id="dimensionNom" placeholder="Ex: Petit, Moyen...">
+                            </div>
+                            <div class="form-group">
+                                <label>Longueur (cm)</label>
+                                <input type="number" id="dimensionLongueur" step="0.1" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Largeur (cm)</label>
+                                <input type="number" id="dimensionLargeur" step="0.1" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Hauteur (cm)</label>
+                                <input type="number" id="dimensionHauteur" step="0.1" min="0">
+                            </div>
+                        </div>
+                        <div class="tools-buttons" style="margin-top: 15px;">
+                            <button class="btn btn-primary" onclick="saveDimension()">
+                                💾 Enregistrer
+                            </button>
+                            <button class="btn btn-secondary" onclick="cancelDimensionEdit()" id="btnCancelDimension" style="display: none;">
+                                Annuler
                             </button>
                         </div>
                     </div>
@@ -152,10 +185,14 @@
                         <button class="btn btn-success" onclick="exportDatabase()">
                             💾 Exporter toutes les données
                         </button>
-                        <button class="btn btn-secondary" onclick="alert('Fonctionnalité à venir')">
+                        <input type="file" id="dbImportFile" accept=".db" style="display: none;" onchange="importDatabase()">
+                        <button class="btn btn-secondary" onclick="document.getElementById('dbImportFile').click()">
                             📥 Importer des données
                         </button>
                     </div>
+                    <p style="text-align: center; color: #ff6b6b; font-size: 12px; margin-top: 10px;">
+                        ⚠️ L'import remplacera toutes les données actuelles
+                    </p>
                 </div>
 
                 <!-- OUTILS BASE DE DONNÉES -->
@@ -423,6 +460,13 @@
                         <input type="number" id="produitStock" value="0">
                     </div>
                 </div>
+                <div class="form-group">
+                    <label>Dimension par défaut (optionnel)</label>
+                    <select id="produitDimensionId">
+                        <option value="">Aucune dimension par défaut</option>
+                        <!-- Options générées dynamiquement -->
+                    </select>
+                </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modalProduit')">Annuler</button>
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
@@ -462,10 +506,9 @@
                         <label>Statut</label>
                         <select id="colisStatut">
                             <option value="En préparation">En préparation</option>
-                            <option value="Prêt à expédier">Prêt à expédier</option>
-                            <option value="Expédié">Expédié</option>
-                            <option value="En transit">En transit</option>
-                            <option value="Livré">Livré</option>
+                            <option value="Out of stock">Out of stock</option>
+                            <option value="Envoyé">Envoyé</option>
+                            <option value="Incomplet">Incomplet</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -481,12 +524,8 @@
                 <div class="form-group">
                     <label>Dimensions</label>
                     <input type="text" id="colisDimensions" placeholder="Ex: 30x20x15cm">
-                    <div class="dimension-buttons">
-                        <button type="button" class="btn-dimension" onclick="setDimension('20x15x10')">20x15x10</button>
-                        <button type="button" class="btn-dimension" onclick="setDimension('30x20x15')">30x20x15</button>
-                        <button type="button" class="btn-dimension" onclick="setDimension('40x30x20')">40x30x20</button>
-                        <button type="button" class="btn-dimension" onclick="setDimension('50x40x30')">50x40x30</button>
-                        <button type="button" class="btn-dimension" onclick="setDimension('60x40x40')">60x40x40</button>
+                    <div class="dimension-buttons" id="dimensionButtons">
+                        <!-- Dimensions générées dynamiquement -->
                     </div>
                 </div>
 

@@ -260,12 +260,12 @@ app.get('/api/produits', (req, res) => {
 
 // Créer un nouveau produit
 app.post('/api/produits', (req, res) => {
-  const { nom, description, prix, poids, stock } = req.body;
+  const { nom, description, prix, poids, stock, dimension_id } = req.body;
 
   db.run(
-    `INSERT INTO produits (nom, description, prix, poids, stock)
-     VALUES (?, ?, ?, ?, ?)`,
-    [nom, description, prix, poids, stock || 0],
+    `INSERT INTO produits (nom, description, prix, poids, stock, dimension_id)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [nom, description, prix, poids, stock || 0, dimension_id || null],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -278,13 +278,13 @@ app.post('/api/produits', (req, res) => {
 
 // Mettre à jour un produit
 app.put('/api/produits/:id', (req, res) => {
-  const { nom, description, prix, poids, stock } = req.body;
+  const { nom, description, prix, poids, stock, dimension_id } = req.body;
 
   db.run(
     `UPDATE produits
-     SET nom=?, description=?, prix=?, poids=?, stock=?
+     SET nom=?, description=?, prix=?, poids=?, stock=?, dimension_id=?
      WHERE id=?`,
-    [nom, description, prix, poids, stock, req.params.id],
+    [nom, description, prix, poids, stock, dimension_id || null, req.params.id],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -706,6 +706,76 @@ app.post('/api/etiquettes/pdf', (req, res) => {
   });
 });
 
+// ============= ROUTES DIMENSIONS =============
+
+// Récupérer toutes les dimensions
+app.get('/api/dimensions', (req, res) => {
+  db.all('SELECT * FROM dimensions ORDER BY longueur ASC', [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json(rows);
+  });
+});
+
+// Créer une nouvelle dimension
+app.post('/api/dimensions', (req, res) => {
+  const { nom, longueur, largeur, hauteur, is_default } = req.body;
+
+  db.run(
+    `INSERT INTO dimensions (nom, longueur, largeur, hauteur, is_default)
+     VALUES (?, ?, ?, ?, ?)`,
+    [nom, longueur, largeur, hauteur, is_default ? 1 : 0],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ id: this.lastID, message: 'Dimension créée avec succès' });
+    }
+  );
+});
+
+// Mettre à jour une dimension
+app.put('/api/dimensions/:id', (req, res) => {
+  const { nom, longueur, largeur, hauteur, is_default } = req.body;
+
+  db.run(
+    `UPDATE dimensions
+     SET nom=?, longueur=?, largeur=?, hauteur=?, is_default=?
+     WHERE id=?`,
+    [nom, longueur, largeur, hauteur, is_default ? 1 : 0, req.params.id],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ message: 'Dimension mise à jour', changes: this.changes });
+    }
+  );
+});
+
+// Supprimer une dimension
+app.delete('/api/dimensions/:id', (req, res) => {
+  // D'abord, retirer cette dimension des produits qui l'utilisent
+  db.run('UPDATE produits SET dimension_id = NULL WHERE dimension_id = ?', [req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+
+    // Ensuite supprimer la dimension
+    db.run('DELETE FROM dimensions WHERE id = ?', [req.params.id], function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ message: 'Dimension supprimée', changes: this.changes });
+    });
+  });
+});
+
 // ============= STATISTIQUES =============
 
 app.get('/api/stats', (req, res) => {
@@ -720,14 +790,15 @@ app.get('/api/stats', (req, res) => {
       db.get('SELECT COUNT(*) as count FROM colis', [], (err, row) => {
         stats.colis = row ? row.count : 0;
 
-        db.get("SELECT COUNT(*) as count FROM colis WHERE statut='En préparation'", [], (err, row) => {
+        // Compter les colis en attente (En préparation, Out of stock, Incomplet)
+        db.get("SELECT COUNT(*) as count FROM colis WHERE statut IN ('En préparation', 'Out of stock', 'Incomplet')", [], (err, row) => {
           stats.colisEnPreparation = row ? row.count : 0;
 
-          db.get("SELECT COUNT(*) as count FROM colis WHERE statut='Expédié'", [], (err, row) => {
-            stats.colisExpedies = row ? row.count : 0;
+          db.get("SELECT COUNT(*) as count FROM colis WHERE statut='Envoyé'", [], (err, row) => {
+            stats.colisEnvoyes = row ? row.count : 0;
 
-            db.get("SELECT COUNT(*) as count FROM colis WHERE statut='Livré'", [], (err, row) => {
-              stats.colisLivres = row ? row.count : 0;
+            db.get("SELECT COUNT(*) as count FROM colis WHERE statut='Out of stock'", [], (err, row) => {
+              stats.colisOutOfStock = row ? row.count : 0;
               res.json(stats);
             });
           });
@@ -753,6 +824,49 @@ app.get('/api/database/export', (req, res) => {
       res.status(500).json({ error: 'Erreur lors de l\'export' });
     }
   });
+});
+
+// Importer la base de données
+app.post('/api/database/import', upload.single('dbFile'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Aucun fichier uploadé' });
+  }
+
+  const uploadedPath = req.file.path;
+  const dbPath = path.join(__dirname, 'crm.db');
+
+  try {
+    // Fermer la connexion actuelle à la base de données
+    db.close((err) => {
+      if (err) {
+        console.error('Erreur fermeture DB:', err);
+      }
+
+      // Copier le fichier uploadé pour remplacer la base de données
+      fs.copyFileSync(uploadedPath, dbPath);
+
+      // Supprimer le fichier temporaire
+      fs.unlinkSync(uploadedPath);
+
+      // Réouvrir la connexion à la base de données
+      const sqlite3 = require('sqlite3').verbose();
+      const newDb = new sqlite3.Database(dbPath);
+
+      // Mettre à jour la référence globale
+      Object.assign(db, newDb);
+
+      res.json({ message: 'Base de données importée avec succès' });
+    });
+  } catch (error) {
+    console.error('Erreur import base de données:', error);
+
+    // Nettoyer le fichier temporaire en cas d'erreur
+    if (fs.existsSync(uploadedPath)) {
+      fs.unlinkSync(uploadedPath);
+    }
+
+    res.status(500).json({ error: 'Erreur lors de l\'import: ' + error.message });
+  }
 });
 
 // Réinitialiser la base de données
