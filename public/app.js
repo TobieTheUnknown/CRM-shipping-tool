@@ -285,28 +285,93 @@ async function loadColis() {
 }
 
 function displayColis() {
-    const tbody = document.getElementById('colisTableBody');
+    // Séparer les colis en deux catégories
+    const colisEnAttente = colis.filter(c =>
+        c.statut === 'En préparation' || c.statut === 'Prêt à expédier'
+    );
+    const colisExpedies = colis.filter(c =>
+        c.statut === 'Expédié' || c.statut === 'En transit' || c.statut === 'Livré'
+    );
 
-    if (colis.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty">Aucun colis</td></tr>';
-        return;
+    // Afficher les compteurs
+    document.getElementById('countEnAttente').textContent = colisEnAttente.length;
+    document.getElementById('countExpedies').textContent = colisExpedies.length;
+
+    // Afficher colis en attente
+    const tbodyAttente = document.getElementById('colisEnAttenteBody');
+    if (colisEnAttente.length === 0) {
+        tbodyAttente.innerHTML = '<tr><td colspan="8" class="empty">Aucun colis en attente</td></tr>';
+    } else {
+        tbodyAttente.innerHTML = colisEnAttente.map(c => renderColisRow(c, 'attente')).join('');
     }
 
-    tbody.innerHTML = colis.map(c => `
-        <tr>
-            <td><input type="checkbox" class="colis-checkbox" value="${c.id}" onchange="updateSelection()"></td>
-            <td><strong>${c.numero_suivi || 'N/A'}</strong></td>
-            <td>${c.client_nom} ${c.client_prenom || ''}</td>
+    // Afficher colis expédiés
+    const tbodyExpedies = document.getElementById('colisExpediesBody');
+    if (colisExpedies.length === 0) {
+        tbodyExpedies.innerHTML = '<tr><td colspan="8" class="empty">Aucun colis envoyé</td></tr>';
+    } else {
+        tbodyExpedies.innerHTML = colisExpedies.map(c => renderColisRow(c, 'expedies')).join('');
+    }
+}
+
+function parseNotesData(notes) {
+    const data = { item: '', lien: '' };
+    if (!notes) return data;
+
+    const lines = notes.split('\n');
+    lines.forEach(line => {
+        if (line.startsWith('Item: ')) {
+            data.item = line.replace('Item: ', '').trim();
+        } else if (line.startsWith('Lien: ')) {
+            data.lien = line.replace('Lien: ', '').trim();
+        }
+    });
+    return data;
+}
+
+function renderColisRow(c, section) {
+    const notesData = parseNotesData(c.notes);
+    const isNonFrance = (c.pays_expedition && c.pays_expedition.toLowerCase() !== 'france');
+    const rowClass = isNonFrance ? 'non-france' : '';
+
+    // Formater la date
+    const date = new Date(c.date_creation);
+    const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    // Produit avec lien cliquable
+    let produitHtml = '';
+    if (notesData.item && notesData.lien) {
+        produitHtml = `<a href="${notesData.lien}" target="_blank" class="product-link">${notesData.item}</a>`;
+    } else if (notesData.item) {
+        produitHtml = `<span class="product-name">${notesData.item}</span>`;
+    } else {
+        produitHtml = '<span style="color: #999;">-</span>';
+    }
+
+    // Client et adresse
+    const clientNom = `${c.client_nom || ''} ${c.client_prenom || ''}`.trim();
+    const adresse = c.ville_expedition || c.adresse_expedition || '';
+    const pays = c.pays_expedition || 'France';
+    const clientHtml = `
+        <span class="client-name">${clientNom}</span>
+        <span class="client-address">${adresse}${pays !== 'France' ? ` - ${pays}` : ''}</span>
+    `;
+
+    return `
+        <tr class="${rowClass}">
+            <td><input type="checkbox" class="colis-checkbox colis-checkbox-${section}" value="${c.id}" onchange="updateSelection()"></td>
+            <td>${dateStr}</td>
+            <td>${produitHtml}</td>
+            <td>${clientHtml}</td>
             <td><span class="badge badge-${getStatutClass(c.statut)}">${c.statut}</span></td>
-            <td>${c.poids ? c.poids + ' kg' : ''}</td>
-            <td>${c.ville_expedition || ''} ${c.code_postal_expedition || ''}</td>
-            <td>${new Date(c.date_creation).toLocaleDateString('fr-FR')}</td>
+            <td>${c.poids ? c.poids + ' kg' : '-'}</td>
+            <td><strong>${c.numero_suivi || 'N/A'}</strong></td>
             <td class="actions">
                 <button class="btn btn-edit btn-small" onclick="editColis(${c.id})">✏️</button>
                 <button class="btn btn-danger btn-small" onclick="deleteColis(${c.id})">🗑️</button>
             </td>
         </tr>
-    `).join('');
+    `;
 }
 
 function getStatutClass(statut) {
@@ -413,15 +478,31 @@ async function deleteColis(id) {
 
 // ============= SÉLECTION MULTIPLE =============
 
-function toggleSelectAll() {
-    const selectAll = document.getElementById('selectAllColis');
-    const checkboxes = document.querySelectorAll('.colis-checkbox');
+function toggleSelectAll(section) {
+    const selectAll = event.target;
+    const checkboxes = document.querySelectorAll(`.colis-checkbox-${section}`);
 
     checkboxes.forEach(cb => {
         cb.checked = selectAll.checked;
     });
 
     updateSelection();
+}
+
+// Toggle section collapsible
+function toggleSection(sectionId) {
+    const section = document.getElementById(`section${sectionId.charAt(0).toUpperCase() + sectionId.slice(1)}`);
+    const icon = document.getElementById(`toggle${sectionId.charAt(0).toUpperCase() + sectionId.slice(1)}`);
+
+    if (section.classList.contains('collapsed')) {
+        section.classList.remove('collapsed');
+        icon.classList.remove('rotated');
+        icon.textContent = '▼';
+    } else {
+        section.classList.add('collapsed');
+        icon.classList.add('rotated');
+        icon.textContent = '►';
+    }
 }
 
 function updateSelection() {

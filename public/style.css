@@ -573,3 +573,84 @@ input[type="checkbox"] {
         grid-template-columns: 1fr;
     }
 }
+
+/* COLIS SECTIONS */
+.colis-section {
+    margin-bottom: 30px;
+}
+
+.section-title {
+    background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    color: #667eea;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.section-title.collapsible {
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.3s;
+}
+
+.section-title.collapsible:hover {
+    background: linear-gradient(135deg, #667eea30 0%, #764ba230 100%);
+}
+
+.toggle-icon {
+    font-size: 0.8em;
+    transition: transform 0.3s;
+}
+
+.toggle-icon.rotated {
+    transform: rotate(-90deg);
+}
+
+.table-container.collapsed {
+    display: none;
+}
+
+/* HIGHLIGHT NON-FRANCE */
+.non-france {
+    background-color: #fff3cd !important;
+}
+
+.non-france:hover {
+    background-color: #ffe69c !important;
+}
+
+/* PRODUCT LINK */
+.product-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.product-link:hover {
+    color: #5568d3;
+    text-decoration: underline;
+}
+
+.product-name {
+    display: block;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 2px;
+}
+
+.client-address {
+    display: block;
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 3px;
+}
+
+.client-name {
+    font-weight: 600;
+    color: #333;
+}

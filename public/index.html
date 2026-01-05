@@ -102,24 +102,55 @@
                 </button>
             </div>
 
-            <div class="table-container">
-                <table id="colisTable">
-                    <thead>
-                        <tr>
-                            <th><input type="checkbox" id="selectAllColis" onchange="toggleSelectAll()"></th>
-                            <th>N° Suivi</th>
-                            <th>Client</th>
-                            <th>Statut</th>
-                            <th>Poids</th>
-                            <th>Destination</th>
-                            <th>Date création</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="colisTableBody">
-                        <tr><td colspan="8" class="empty">Aucun colis</td></tr>
-                    </tbody>
-                </table>
+            <!-- COLIS EN ATTENTE -->
+            <div class="colis-section">
+                <h3 class="section-title">📦 Colis en attente (<span id="countEnAttente">0</span>)</h3>
+                <div class="table-container">
+                    <table class="colisTable">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('attente')"></th>
+                                <th>Date</th>
+                                <th>Produit</th>
+                                <th>Client / Adresse</th>
+                                <th>Statut</th>
+                                <th>Poids</th>
+                                <th>N° Suivi</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="colisEnAttenteBody">
+                            <tr><td colspan="8" class="empty">Aucun colis en attente</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- COLIS ENVOYÉS -->
+            <div class="colis-section">
+                <h3 class="section-title collapsible" onclick="toggleSection('expedies')">
+                    📫 Colis envoyés (<span id="countExpedies">0</span>)
+                    <span class="toggle-icon" id="toggleExpedies">▼</span>
+                </h3>
+                <div class="table-container" id="sectionExpedies">
+                    <table class="colisTable">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('expedies')"></th>
+                                <th>Date</th>
+                                <th>Produit</th>
+                                <th>Client / Adresse</th>
+                                <th>Statut</th>
+                                <th>Poids</th>
+                                <th>N° Suivi</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="colisExpediesBody">
+                            <tr><td colspan="8" class="empty">Aucun colis envoyé</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
