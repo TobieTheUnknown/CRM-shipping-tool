@@ -1,14 +1,21 @@
 {
-  "name": "crm-shipping-tool",
+  "name": "shiptrack-crm",
   "version": "1.0.0",
   "description": "Outil CRM léger pour gestion et tracking de colis",
-  "main": "server.js",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "electron": "electron .",
+    "electron:dev": "NODE_ENV=development electron .",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux",
+    "dist": "electron-builder --mac --win --linux"
   },
-  "keywords": ["crm", "shipping", "tracking", "packages"],
-  "author": "",
+  "keywords": ["crm", "shipping", "tracking", "packages", "logistics"],
+  "author": "TobieTheUnknown",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
@@ -20,6 +27,64 @@
     "csv-parser": "^3.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.shiptrack.crm",
+    "productName": "ShipTrack CRM",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!.git/**",
+      "!.github/**",
+      "!*.md"
+    ],
+    "extraResources": [
+      {
+        "from": "crm.db",
+        "to": "crm.db",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "icon": "assets/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.ico"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "assets/icon.png",
+      "category": "Office"
+    }
   }
 }
