@@ -1003,6 +1003,19 @@ async function imprimerEtiquettesSelection() {
         return;
     }
 
+    // Demander AVANT la génération si l'utilisateur veut marquer comme expédiés
+    const nombreColis = selectedColis.size;
+    const messageConfirm = nombreColis === 1
+        ? 'Voulez-vous passer ce colis en "Expédié" ?'
+        : `Voulez-vous passer ces ${nombreColis} colis en "Expédié" ?`;
+
+    const marquerExpedies = confirm(messageConfirm);
+
+    // Si oui, marquer comme expédiés AVANT de générer le PDF
+    if (marquerExpedies) {
+        await marquerColisExpedies(Array.from(selectedColis));
+    }
+
     try {
         // Récupérer le logo depuis localStorage
         const logoData = localStorage.getItem('shippingLogo');
@@ -1027,18 +1040,7 @@ async function imprimerEtiquettesSelection() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
-            // Demander si l'utilisateur veut marquer les colis comme expédiés
-            const nombreColis = selectedColis.size;
-            const messageConfirm = nombreColis === 1
-                ? 'Voulez-vous passer ce colis en "Expédié" ?'
-                : `Voulez-vous passer ces ${nombreColis} colis en "Expédié" ?`;
-
-            if (confirm(messageConfirm)) {
-                await marquerColisExpedies(Array.from(selectedColis));
-                alert(`${nombreColis} étiquette(s) générée(s) avec succès!\nColis marqués comme "Expédié".`);
-            } else {
-                alert(`${nombreColis} étiquette(s) générée(s) avec succès!\n\nFormat: 6 étiquettes par page (2x3)`);
-            }
+            // Pas d'alerte de succès - le téléchargement du PDF est suffisant
         } else {
             alert('Erreur lors de la génération du PDF');
         }
