@@ -34,11 +34,7 @@
             </div>
 
             <nav class="nav">
-                <div class="nav-item active" data-tab="planning">
-                    <span class="nav-icon">📋</span>
-                    <span>Planning</span>
-                </div>
-                <div class="nav-item" data-tab="colis">
+                <div class="nav-item active" data-tab="colis">
                     <span class="nav-icon">📦</span>
                     <span>Colis</span>
                 </div>
@@ -50,19 +46,53 @@
                     <span class="nav-icon">🏷️</span>
                     <span>Produits</span>
                 </div>
+                <div class="nav-item" data-tab="settings">
+                    <span class="nav-icon">⚙️</span>
+                    <span>Paramètres</span>
+                </div>
             </nav>
         </aside>
 
         <!-- MAIN CONTENT -->
         <main class="main-content">
-            <!-- TAB PLANNING -->
-            <div id="tab-planning" class="tab-content active">
+            <!-- TAB SETTINGS -->
+            <div id="tab-settings" class="tab-content">
                 <div class="page-header">
                     <div>
-                        <h1 class="page-title">Import CSV Planning</h1>
-                        <p class="page-subtitle">Importez vos colis en masse via un fichier CSV</p>
+                        <h1 class="page-title">⚙️ Paramètres</h1>
+                        <p class="page-subtitle">Configuration et gestion des données</p>
                     </div>
                 </div>
+
+                <!-- CONFIGURATION LOGO -->
+                <div class="database-tools">
+                    <h3>🖼️ Logo pour Étiquettes</h3>
+                    <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                        Logo affiché sur les étiquettes d'expédition (format horizontal recommandé)
+                    </p>
+                    <div class="logo-upload-section">
+                        <div id="logoPreview" class="logo-preview">
+                            <img id="logoImage" src="" alt="Logo" style="display: none; max-width: 100%; max-height: 80px;">
+                            <p id="logoPlaceholder">Aucun logo configuré</p>
+                        </div>
+                        <div class="logo-actions">
+                            <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/jpg" style="display: none;" onchange="uploadLogo()">
+                            <button class="btn btn-primary" onclick="document.getElementById('logoFileInput').click()">
+                                📤 Choisir un logo
+                            </button>
+                            <button class="btn btn-danger" onclick="removeLogo()" id="btnRemoveLogo" style="display: none;">
+                                🗑️ Supprimer le logo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IMPORT CSV -->
+                <div class="database-tools">
+                    <h3>📋 Import CSV</h3>
+                    <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                        Importez vos colis en masse via un fichier CSV
+                    </p>
 
                 <div class="csv-upload-section">
                     <div class="upload-card">
@@ -106,32 +136,25 @@
                 </div>
 
                 <div class="csv-example">
-                    <h3>📝 Exemple de fichier CSV</h3>
-                    <button class="btn btn-secondary" onclick="downloadExampleCSV()" style="margin-top: 12px;">
+                    <button class="btn btn-secondary" onclick="downloadExampleCSV()">
                         💾 Télécharger un modèle CSV
                     </button>
                 </div>
+                </div>
 
-                <!-- CONFIGURATION LOGO -->
+                <!-- EXPORT/IMPORT DONNÉES -->
                 <div class="database-tools">
-                    <h3>🖼️ Configuration Logo pour Étiquettes</h3>
-                    <p style="text-align: center; color: var(--text-secondary); margin-bottom: 15px; font-size: 13px;">
-                        Logo affiché sur les étiquettes d'expédition (format horizontal recommandé)
+                    <h3>💾 Export / Import de données</h3>
+                    <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                        Exportez ou importez l'ensemble de vos données (clients, produits, colis)
                     </p>
-                    <div class="logo-upload-section">
-                        <div id="logoPreview" class="logo-preview">
-                            <img id="logoImage" src="" alt="Logo" style="display: none; max-width: 100%; max-height: 80px;">
-                            <p id="logoPlaceholder">Aucun logo configuré</p>
-                        </div>
-                        <div class="logo-actions">
-                            <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/jpg" style="display: none;" onchange="uploadLogo()">
-                            <button class="btn btn-primary" onclick="document.getElementById('logoFileInput').click()">
-                                📤 Choisir un logo
-                            </button>
-                            <button class="btn btn-danger" onclick="removeLogo()" id="btnRemoveLogo" style="display: none;">
-                                🗑️ Supprimer le logo
-                            </button>
-                        </div>
+                    <div class="tools-buttons">
+                        <button class="btn btn-success" onclick="exportDatabase()">
+                            💾 Exporter toutes les données
+                        </button>
+                        <button class="btn btn-secondary" onclick="alert('Fonctionnalité à venir')">
+                            📥 Importer des données
+                        </button>
                     </div>
                 </div>
 
@@ -141,9 +164,6 @@
                     <div class="tools-buttons">
                         <button class="btn btn-success" onclick="initTestData()">
                             🎲 Charger des données de test
-                        </button>
-                        <button class="btn btn-secondary" onclick="exportDatabase()">
-                            💾 Exporter la base de données
                         </button>
                         <button class="btn btn-danger" onclick="resetDatabase()">
                             🗑️ Réinitialiser la base de données
@@ -156,7 +176,7 @@
             </div>
 
             <!-- TAB COLIS -->
-            <div id="tab-colis" class="tab-content">
+            <div id="tab-colis" class="tab-content active">
                 <div class="page-header">
                     <div>
                         <h1 class="page-title">Gestion des Colis</h1>
@@ -294,6 +314,20 @@
         <div class="modal-content">
             <span class="close" onclick="closeModal('modalClient')">&times;</span>
             <h2>Nouveau Client</h2>
+
+            <!-- Option de remplissage automatique -->
+            <div style="margin-bottom: 20px; padding: 10px; background: #f0f7ff; border-radius: 8px;">
+                <button type="button" class="btn btn-secondary btn-small" onclick="toggleQuickFillClient()" style="width: 100%;">
+                    🔍 Remplissage automatique (coller des infos en vrac)
+                </button>
+                <div id="quickFillClientSection" style="display: none; margin-top: 15px;">
+                    <textarea id="quickFillClientInput" rows="6" placeholder="Collez les infos du client ici...&#10;Exemple:&#10;John Doe&#10;123 Main Street&#10;75001 Paris, France&#10;john.doe@example.com&#10;0601020304" style="width: 100%; font-family: monospace; font-size: 13px; padding: 10px; border: 1px solid #ddd; border-radius: 5px;"></textarea>
+                    <button type="button" class="btn btn-primary btn-small" onclick="parseAndFillClientForm()" style="margin-top: 10px;">
+                        ✨ Analyser et remplir les champs
+                    </button>
+                </div>
+            </div>
+
             <form id="formClient" onsubmit="saveClient(event)">
                 <input type="hidden" id="clientId">
                 <div class="form-group">
@@ -406,11 +440,16 @@
                 <input type="hidden" id="colisId">
 
                 <div class="form-row">
-                    <div class="form-group">
+                    <div class="form-group" style="flex: 1;">
                         <label>Client *</label>
-                        <select id="colisClientId" required onchange="fillClientAddress()">
-                            <option value="">Sélectionner un client</option>
-                        </select>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="colisClientId" required onchange="fillClientAddress()" style="flex: 1;">
+                                <option value="">Sélectionner un client</option>
+                            </select>
+                            <button type="button" class="btn btn-secondary btn-small" onclick="showQuickClientModal()" title="Créer un client rapidement">
+                                ➕ Créer
+                            </button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>N° de Suivi</label>
@@ -485,6 +524,38 @@
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL CRÉATION RAPIDE CLIENT -->
+    <div id="modalQuickClient" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('modalQuickClient')">&times;</span>
+            <h2>Créer un Client Rapidement</h2>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
+                Collez les informations du client (nom, adresse, email, téléphone) et elles seront automatiquement reconnues.
+            </p>
+
+            <div class="form-group">
+                <label>Informations du client</label>
+                <textarea id="quickClientInput" rows="8" placeholder="Exemple:&#10;John Doe&#10;123 Main Street&#10;75001 Paris, France&#10;john.doe@example.com&#10;0601020304" style="font-family: monospace; font-size: 13px;"></textarea>
+            </div>
+
+            <div style="text-align: center; margin: 15px 0;">
+                <button type="button" class="btn btn-primary" onclick="parseQuickClient()">
+                    🔍 Analyser et pré-remplir
+                </button>
+            </div>
+
+            <div id="parsedClientPreview" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                <h3 style="margin-top: 0; font-size: 14px; color: #666;">Aperçu des données détectées:</h3>
+                <div id="parsedClientData" style="font-size: 13px;"></div>
+
+                <div class="form-actions" style="margin-top: 15px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modalQuickClient')">Annuler</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmQuickClient()">✓ Créer ce client</button>
+                </div>
+            </div>
         </div>
     </div>
 
