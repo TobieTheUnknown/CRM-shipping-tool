@@ -720,14 +720,15 @@ app.get('/api/stats', (req, res) => {
       db.get('SELECT COUNT(*) as count FROM colis', [], (err, row) => {
         stats.colis = row ? row.count : 0;
 
-        db.get("SELECT COUNT(*) as count FROM colis WHERE statut='En préparation'", [], (err, row) => {
+        // Compter les colis en attente (En préparation, Out of stock, Incomplet)
+        db.get("SELECT COUNT(*) as count FROM colis WHERE statut IN ('En préparation', 'Out of stock', 'Incomplet')", [], (err, row) => {
           stats.colisEnPreparation = row ? row.count : 0;
 
-          db.get("SELECT COUNT(*) as count FROM colis WHERE statut='Expédié'", [], (err, row) => {
-            stats.colisExpedies = row ? row.count : 0;
+          db.get("SELECT COUNT(*) as count FROM colis WHERE statut='Envoyé'", [], (err, row) => {
+            stats.colisEnvoyes = row ? row.count : 0;
 
-            db.get("SELECT COUNT(*) as count FROM colis WHERE statut='Livré'", [], (err, row) => {
-              stats.colisLivres = row ? row.count : 0;
+            db.get("SELECT COUNT(*) as count FROM colis WHERE statut='Out of stock'", [], (err, row) => {
+              stats.colisOutOfStock = row ? row.count : 0;
               res.json(stats);
             });
           });
@@ -753,6 +754,49 @@ app.get('/api/database/export', (req, res) => {
       res.status(500).json({ error: 'Erreur lors de l\'export' });
     }
   });
+});
+
+// Importer la base de données
+app.post('/api/database/import', upload.single('dbFile'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Aucun fichier uploadé' });
+  }
+
+  const uploadedPath = req.file.path;
+  const dbPath = path.join(__dirname, 'crm.db');
+
+  try {
+    // Fermer la connexion actuelle à la base de données
+    db.close((err) => {
+      if (err) {
+        console.error('Erreur fermeture DB:', err);
+      }
+
+      // Copier le fichier uploadé pour remplacer la base de données
+      fs.copyFileSync(uploadedPath, dbPath);
+
+      // Supprimer le fichier temporaire
+      fs.unlinkSync(uploadedPath);
+
+      // Réouvrir la connexion à la base de données
+      const sqlite3 = require('sqlite3').verbose();
+      const newDb = new sqlite3.Database(dbPath);
+
+      // Mettre à jour la référence globale
+      Object.assign(db, newDb);
+
+      res.json({ message: 'Base de données importée avec succès' });
+    });
+  } catch (error) {
+    console.error('Erreur import base de données:', error);
+
+    // Nettoyer le fichier temporaire en cas d'erreur
+    if (fs.existsSync(uploadedPath)) {
+      fs.unlinkSync(uploadedPath);
+    }
+
+    res.status(500).json({ error: 'Erreur lors de l\'import: ' + error.message });
+  }
 });
 
 // Réinitialiser la base de données

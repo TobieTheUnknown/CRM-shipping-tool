@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initTabs() {
+    // Include nav items from both main nav and nav-bottom
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
         item.addEventListener('click', () => {
@@ -759,10 +760,10 @@ async function loadColis() {
 function displayColis() {
     // Séparer les colis en deux catégories
     const colisEnAttente = colis.filter(c =>
-        c.statut === 'En préparation' || c.statut === 'Prêt à expédier'
+        c.statut === 'En préparation' || c.statut === 'Out of stock' || c.statut === 'Incomplet'
     );
     const colisExpedies = colis.filter(c =>
-        c.statut === 'Expédié' || c.statut === 'En transit' || c.statut === 'Livré'
+        c.statut === 'Envoyé'
     );
 
     // Afficher les compteurs
@@ -849,10 +850,9 @@ function renderColisRow(c, section) {
 function getStatutClass(statut) {
     const mapping = {
         'En préparation': 'preparation',
-        'Prêt à expédier': 'pret',
-        'Expédié': 'expedie',
-        'En transit': 'transit',
-        'Livré': 'livre'
+        'Out of stock': 'outofstock',
+        'Envoyé': 'envoye',
+        'Incomplet': 'incomplet'
     };
     return mapping[statut] || 'preparation';
 }
@@ -1003,11 +1003,11 @@ async function imprimerEtiquettesSelection() {
         return;
     }
 
-    // Demander AVANT la génération si l'utilisateur veut marquer comme expédiés
+    // Demander AVANT la génération si l'utilisateur veut marquer comme envoyés
     const nombreColis = selectedColis.size;
     const messageConfirm = nombreColis === 1
-        ? 'Voulez-vous passer ce colis en "Expédié" ?'
-        : `Voulez-vous passer ces ${nombreColis} colis en "Expédié" ?`;
+        ? 'Voulez-vous passer ce colis en "Envoyé" ?'
+        : `Voulez-vous passer ces ${nombreColis} colis en "Envoyé" ?`;
 
     const marquerExpedies = confirm(messageConfirm);
 
@@ -1062,7 +1062,7 @@ async function marquerColisExpedies(colisIds) {
             const updateData = {
                 client_id: colisData.client_id,
                 numero_suivi: colisData.numero_suivi,
-                statut: 'Expédié',
+                statut: 'Envoyé',
                 poids: colisData.poids,
                 dimensions: colisData.dimensions,
                 reference: colisData.reference,
@@ -1090,7 +1090,7 @@ async function marquerColisExpedies(colisIds) {
 
         // Désélectionner tous les colis
         selectedColis.clear();
-        updateSelectionUI();
+        updateSelection();
     } catch (error) {
         console.error('Erreur lors de la mise à jour des statuts:', error);
         alert('Erreur lors de la mise à jour du statut des colis');
@@ -1281,6 +1281,64 @@ function exportDatabase() {
     setTimeout(() => {
         resultDiv.style.display = 'none';
     }, 3000);
+}
+
+// Importer la base de données
+async function importDatabase() {
+    const fileInput = document.getElementById('dbImportFile');
+    const file = fileInput.files[0];
+
+    if (!file) return;
+
+    if (!confirm('⚠️ ATTENTION ⚠️\n\nL\'import va REMPLACER toutes vos données actuelles par celles du fichier.\n\nVoulez-vous continuer?')) {
+        fileInput.value = '';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('dbFile', file);
+
+    const resultDiv = document.getElementById('dbToolsResult');
+    const contentDiv = document.getElementById('dbToolsResultContent');
+    contentDiv.innerHTML = `<p>⏳ Import en cours...</p>`;
+    resultDiv.style.display = 'block';
+
+    try {
+        const response = await fetch(`${API_URL}/api/database/import`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            contentDiv.innerHTML = `
+                <p class="import-success">✅ ${result.message}</p>
+                <p>La base de données a été importée avec succès.</p>
+            `;
+
+            // Rafraîchir toutes les données
+            setTimeout(() => {
+                loadStats();
+                loadClients();
+                loadProduits();
+                loadColis();
+            }, 500);
+        } else {
+            contentDiv.innerHTML = `
+                <p class="import-error">❌ Erreur lors de l'import</p>
+                <p>${result.error || 'Une erreur est survenue'}</p>
+            `;
+        }
+    } catch (error) {
+        console.error('Erreur import base de données:', error);
+        contentDiv.innerHTML = `
+            <p class="import-error">❌ Erreur réseau</p>
+            <p>${error.message}</p>
+        `;
+    } finally {
+        fileInput.value = '';
+    }
 }
 
 // Réinitialiser la base de données

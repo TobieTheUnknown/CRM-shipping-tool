@@ -18,39 +18,29 @@
                 <div class="logo-subtitle">Logistics CRM</div>
             </div>
 
-            <div class="stats-sidebar">
-                <div class="stat-mini">
-                    <span class="stat-mini-label">Clients</span>
-                    <span class="stat-mini-value" id="statClientsSidebar">0</span>
-                </div>
-                <div class="stat-mini">
-                    <span class="stat-mini-label">Colis actifs</span>
-                    <span class="stat-mini-value" id="statColisSidebar">0</span>
-                </div>
-                <div class="stat-mini">
-                    <span class="stat-mini-label">En préparation</span>
-                    <span class="stat-mini-value" id="statPrepSidebar">0</span>
-                </div>
-            </div>
-
             <nav class="nav">
                 <div class="nav-item active" data-tab="colis">
                     <span class="nav-icon">📦</span>
-                    <span>Colis</span>
+                    <span>Colis en préparation</span>
+                    <span class="nav-badge" id="statPrepSidebar">0</span>
                 </div>
                 <div class="nav-item" data-tab="clients">
                     <span class="nav-icon">👥</span>
                     <span>Clients</span>
+                    <span class="nav-badge" id="statClientsSidebar">0</span>
                 </div>
                 <div class="nav-item" data-tab="produits">
                     <span class="nav-icon">🏷️</span>
                     <span>Produits</span>
                 </div>
+            </nav>
+
+            <div class="nav-bottom">
                 <div class="nav-item" data-tab="settings">
                     <span class="nav-icon">⚙️</span>
                     <span>Paramètres</span>
                 </div>
-            </nav>
+            </div>
         </aside>
 
         <!-- MAIN CONTENT -->
@@ -152,10 +142,14 @@
                         <button class="btn btn-success" onclick="exportDatabase()">
                             💾 Exporter toutes les données
                         </button>
-                        <button class="btn btn-secondary" onclick="alert('Fonctionnalité à venir')">
+                        <input type="file" id="dbImportFile" accept=".db" style="display: none;" onchange="importDatabase()">
+                        <button class="btn btn-secondary" onclick="document.getElementById('dbImportFile').click()">
                             📥 Importer des données
                         </button>
                     </div>
+                    <p style="text-align: center; color: #ff6b6b; font-size: 12px; margin-top: 10px;">
+                        ⚠️ L'import remplacera toutes les données actuelles
+                    </p>
                 </div>
 
                 <!-- OUTILS BASE DE DONNÉES -->
@@ -462,10 +456,9 @@
                         <label>Statut</label>
                         <select id="colisStatut">
                             <option value="En préparation">En préparation</option>
-                            <option value="Prêt à expédier">Prêt à expédier</option>
-                            <option value="Expédié">Expédié</option>
-                            <option value="En transit">En transit</option>
-                            <option value="Livré">Livré</option>
+                            <option value="Out of stock">Out of stock</option>
+                            <option value="Envoyé">Envoyé</option>
+                            <option value="Incomplet">Incomplet</option>
                         </select>
                     </div>
                     <div class="form-group">
