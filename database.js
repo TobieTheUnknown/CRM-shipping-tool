@@ -1,18 +1,12 @@
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const path = require('path');
 
-const db = new sqlite3.Database(path.join(__dirname, 'crm.db'), (err) => {
-  if (err) {
-    console.error('Erreur connexion base de données:', err.message);
-  } else {
-    console.log('Connecté à la base de données SQLite.');
-    initDatabase();
-  }
-});
+const db = new Database(path.join(__dirname, 'crm.db'));
+console.log('Connecté à la base de données SQLite.');
 
 function initDatabase() {
   // Table Clients
-  db.run(`CREATE TABLE IF NOT EXISTS clients (
+  db.exec(`CREATE TABLE IF NOT EXISTS clients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nom TEXT NOT NULL,
     prenom TEXT,
@@ -26,7 +20,7 @@ function initDatabase() {
   )`);
 
   // Table Produits
-  db.run(`CREATE TABLE IF NOT EXISTS produits (
+  db.exec(`CREATE TABLE IF NOT EXISTS produits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nom TEXT NOT NULL,
     description TEXT,
@@ -37,7 +31,7 @@ function initDatabase() {
   )`);
 
   // Table Colis
-  db.run(`CREATE TABLE IF NOT EXISTS colis (
+  db.exec(`CREATE TABLE IF NOT EXISTS colis (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     numero_suivi TEXT UNIQUE,
     client_id INTEGER NOT NULL,
@@ -57,35 +51,28 @@ function initDatabase() {
   )`);
 
   // Ajouter la colonne reference si elle n'existe pas (pour migration)
-  db.run(`ALTER TABLE colis ADD COLUMN reference TEXT`, (err) => {
-    // Ignore l'erreur si la colonne existe déjà
-    if (err && !err.message.includes('duplicate column')) {
-      console.error('Erreur ajout colonne reference:', err.message);
-    }
-  });
+  try {
+    db.exec(`ALTER TABLE colis ADD COLUMN reference TEXT`);
+  } catch (err) {
+    // Colonne existe déjà
+  }
 
   // Ajouter les colonnes wallet et lien aux clients (pour migration)
-  // Ces colonnes stockent des données JSON pour permettre plusieurs entrées
-  db.run(`ALTER TABLE clients ADD COLUMN wallet TEXT`, (err) => {
-    if (err && !err.message.includes('duplicate column')) {
-      console.error('Erreur ajout colonne wallet:', err.message);
-    }
-  });
+  try {
+    db.exec(`ALTER TABLE clients ADD COLUMN wallet TEXT`);
+  } catch (err) {}
 
-  db.run(`ALTER TABLE clients ADD COLUMN lien TEXT`, (err) => {
-    if (err && !err.message.includes('duplicate column')) {
-      console.error('Erreur ajout colonne lien:', err.message);
-    }
-  });
+  try {
+    db.exec(`ALTER TABLE clients ADD COLUMN lien TEXT`);
+  } catch (err) {}
 
   // Ajouter ligne d'adresse supplémentaire pour les colis
-  db.run(`ALTER TABLE colis ADD COLUMN adresse_ligne2 TEXT`, (err) => {
-    if (err && !err.message.includes('duplicate column')) {
-      console.error('Erreur ajout colonne adresse_ligne2:', err.message);
-    }
-  });
+  try {
+    db.exec(`ALTER TABLE colis ADD COLUMN adresse_ligne2 TEXT`);
+  } catch (err) {}
+
   // Table Produits dans Colis (relation many-to-many)
-  db.run(`CREATE TABLE IF NOT EXISTS colis_produits (
+  db.exec(`CREATE TABLE IF NOT EXISTS colis_produits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     colis_id INTEGER NOT NULL,
     produit_id INTEGER NOT NULL,
@@ -95,7 +82,7 @@ function initDatabase() {
   )`);
 
   // Table Dimensions de cartons
-  db.run(`CREATE TABLE IF NOT EXISTS dimensions (
+  db.exec(`CREATE TABLE IF NOT EXISTS dimensions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nom TEXT NOT NULL,
     longueur REAL NOT NULL,
@@ -106,30 +93,28 @@ function initDatabase() {
   )`);
 
   // Ajouter dimension_id aux produits pour lien optionnel
-  db.run(`ALTER TABLE produits ADD COLUMN dimension_id INTEGER REFERENCES dimensions(id)`, (err) => {
-    if (err && !err.message.includes('duplicate column')) {
-      console.error('Erreur ajout colonne dimension_id:', err.message);
-    }
-  });
+  try {
+    db.exec(`ALTER TABLE produits ADD COLUMN dimension_id INTEGER REFERENCES dimensions(id)`);
+  } catch (err) {}
 
   // Insérer les dimensions par défaut si la table est vide
-  db.get('SELECT COUNT(*) as count FROM dimensions', [], (err, row) => {
-    if (!err && row && row.count === 0) {
-      const defaultDimensions = [
-        ['Petit', 20, 15, 10, 1],
-        ['Moyen', 30, 20, 15, 1],
-        ['Grand', 40, 30, 20, 1],
-        ['Très grand', 50, 40, 30, 1],
-        ['Extra large', 60, 40, 40, 1]
-      ];
-      const stmt = db.prepare('INSERT INTO dimensions (nom, longueur, largeur, hauteur, is_default) VALUES (?, ?, ?, ?, ?)');
-      defaultDimensions.forEach(d => stmt.run(d));
-      stmt.finalize();
-      console.log('Dimensions par défaut créées.');
-    }
-  });
+  const count = db.prepare('SELECT COUNT(*) as count FROM dimensions').get();
+  if (count && count.count === 0) {
+    const defaultDimensions = [
+      ['Petit', 20, 15, 10, 1],
+      ['Moyen', 30, 20, 15, 1],
+      ['Grand', 40, 30, 20, 1],
+      ['Très grand', 50, 40, 30, 1],
+      ['Extra large', 60, 40, 40, 1]
+    ];
+    const stmt = db.prepare('INSERT INTO dimensions (nom, longueur, largeur, hauteur, is_default) VALUES (?, ?, ?, ?, ?)');
+    defaultDimensions.forEach(d => stmt.run(...d));
+    console.log('Dimensions par défaut créées.');
+  }
 
   console.log('Tables de base de données initialisées.');
 }
+
+initDatabase();
 
 module.exports = db;

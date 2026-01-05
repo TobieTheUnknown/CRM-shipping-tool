@@ -28,7 +28,6 @@ app.use(express.static('public'));
 
 // Fonction pour parser l'adresse
 function parseAdresse(adresseComplete) {
-  // Essayer de parser une adresse du type: "123 Rue de la Paix, 75001 Paris, France"
   const parts = adresseComplete.split(',').map(p => p.trim());
 
   let adresse = '';
@@ -41,7 +40,6 @@ function parseAdresse(adresseComplete) {
   }
 
   if (parts.length >= 2) {
-    // Extraire code postal et ville depuis "75001 Paris"
     const villeMatch = parts[1].match(/(\d{5})\s+(.+)/);
     if (villeMatch) {
       code_postal = villeMatch[1];
@@ -66,106 +64,84 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
 
   const results = [];
   const errors = [];
-  let processedCount = 0;
   let successCount = 0;
 
   fs.createReadStream(req.file.path)
     .pipe(csv())
     .on('data', (data) => results.push(data))
     .on('end', () => {
-      // Supprimer le fichier temporaire
       fs.unlinkSync(req.file.path);
 
       if (results.length === 0) {
         return res.status(400).json({ error: 'Le fichier CSV est vide' });
       }
 
-      // Traiter chaque ligne du CSV
+      const insertClient = db.prepare(
+        `INSERT INTO clients (nom, prenom, adresse, ville, code_postal, pays)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      );
+
+      const insertColis = db.prepare(
+        `INSERT INTO colis (numero_suivi, client_id, statut, poids,
+                            adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
+                            notes, date_creation)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      );
+
       results.forEach((row, index) => {
-        // Parser l'adresse
-        const adresseData = parseAdresse(row["Adresse d'envoi"] || '');
+        try {
+          const adresseData = parseAdresse(row["Adresse d'envoi"] || '');
+          const nomClient = `Client CSV ${index + 1}`;
 
-        // Extraire le nom du client depuis l'adresse ou créer un client par défaut
-        const nomClient = `Client CSV ${index + 1}`;
+          const clientResult = insertClient.run(
+            nomClient, '', adresseData.adresse, adresseData.ville, adresseData.code_postal, adresseData.pays
+          );
+          const clientId = clientResult.lastInsertRowid;
 
-        // D'abord créer ou récupérer le client
-        db.run(
-          `INSERT INTO clients (nom, prenom, adresse, ville, code_postal, pays)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [nomClient, '', adresseData.adresse, adresseData.ville, adresseData.code_postal, adresseData.pays],
-          function(err) {
-            if (err) {
-              errors.push({ row: index + 1, error: err.message });
-              processedCount++;
-              checkIfComplete();
-              return;
-            }
+          const item = row['Item'] || '';
+          const lien = row['Lien'] || '';
+          const prix = parseFloat(row['Prix Objet (€)'] || row['Prix Objet'] || 0);
+          const poids = parseFloat(row['Poids (kg)'] || row['Poids'] || 0);
+          const lienSuivi = row['Lien de suivi colis'] || '';
+          const photos = row['Photos/Vidéos associées'] || '';
+          const statut = row['Statut'] || 'En préparation';
+          const timestamp = row['Timestamp'] || null;
+          const numeroColisMois = row['N° Colis/mois'] || '';
+          const note = row['Note'] || '';
 
-            const clientId = this.lastID;
+          let notesComplete = note;
+          if (item) notesComplete += `\nItem: ${item}`;
+          if (lien) notesComplete += `\nLien: ${lien}`;
+          if (prix) notesComplete += `\nPrix: ${prix}€`;
+          if (photos) notesComplete += `\nPhotos/Vidéos: ${photos}`;
+          if (numeroColisMois) notesComplete += `\nN° Colis/mois: ${numeroColisMois}`;
 
-            // Extraire les données du CSV
-            const item = row['Item'] || '';
-            const lien = row['Lien'] || '';
-            const prix = parseFloat(row['Prix Objet (€)'] || row['Prix Objet'] || 0);
-            const poids = parseFloat(row['Poids (kg)'] || row['Poids'] || 0);
-            const lienSuivi = row['Lien de suivi colis'] || '';
-            const photos = row['Photos/Vidéos associées'] || '';
-            const statut = row['Statut'] || 'En préparation';
-            const timestamp = row['Timestamp'] || null;
-            const numeroColisMois = row['N° Colis/mois'] || '';
-            const note = row['Note'] || '';
+          insertColis.run(
+            lienSuivi || `COL${Date.now()}-${index}`,
+            clientId,
+            statut,
+            poids || null,
+            adresseData.adresse,
+            adresseData.ville,
+            adresseData.code_postal,
+            adresseData.pays,
+            notesComplete.trim(),
+            timestamp || new Date().toISOString()
+          );
 
-            // Construire les notes avec toutes les infos supplémentaires
-            let notesComplete = note;
-            if (item) notesComplete += `\nItem: ${item}`;
-            if (lien) notesComplete += `\nLien: ${lien}`;
-            if (prix) notesComplete += `\nPrix: ${prix}€`;
-            if (photos) notesComplete += `\nPhotos/Vidéos: ${photos}`;
-            if (numeroColisMois) notesComplete += `\nN° Colis/mois: ${numeroColisMois}`;
-
-            // Créer le colis
-            db.run(
-              `INSERT INTO colis (numero_suivi, client_id, statut, poids,
-                                  adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
-                                  notes, date_creation)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              [
-                lienSuivi || `COL${Date.now()}-${index}`,
-                clientId,
-                statut,
-                poids || null,
-                adresseData.adresse,
-                adresseData.ville,
-                adresseData.code_postal,
-                adresseData.pays,
-                notesComplete.trim(),
-                timestamp || new Date().toISOString()
-              ],
-              function(err) {
-                if (err) {
-                  errors.push({ row: index + 1, error: err.message });
-                } else {
-                  successCount++;
-                }
-                processedCount++;
-                checkIfComplete();
-              }
-            );
-          }
-        );
+          successCount++;
+        } catch (err) {
+          errors.push({ row: index + 1, error: err.message });
+        }
       });
 
-      function checkIfComplete() {
-        if (processedCount === results.length) {
-          res.json({
-            message: 'Import terminé',
-            total: results.length,
-            success: successCount,
-            errors: errors.length,
-            errorDetails: errors
-          });
-        }
-      }
+      res.json({
+        message: 'Import terminé',
+        total: results.length,
+        success: successCount,
+        errors: errors.length,
+        errorDetails: errors
+      });
     })
     .on('error', (error) => {
       fs.unlinkSync(req.file.path);
@@ -175,201 +151,163 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
 
 // ============= ROUTES CLIENTS =============
 
-// Récupérer tous les clients
 app.get('/api/clients', (req, res) => {
-  db.all('SELECT * FROM clients ORDER BY date_creation DESC', [], (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
+  try {
+    const rows = db.prepare('SELECT * FROM clients ORDER BY date_creation DESC').all();
     res.json(rows);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Récupérer un client par ID
 app.get('/api/clients/:id', (req, res) => {
-  db.get('SELECT * FROM clients WHERE id = ?', [req.params.id], (err, row) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
+  try {
+    const row = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
     res.json(row);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Créer un nouveau client
 app.post('/api/clients', (req, res) => {
   const { nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien } = req.body;
 
-  db.run(
-    `INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [nom, prenom, email, telephone, adresse, ville, code_postal, pays || 'France', wallet, lien],
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      res.json({ id: this.lastID, message: 'Client créé avec succès' });
-    }
-  );
+  try {
+    const result = db.prepare(
+      `INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(nom, prenom, email, telephone, adresse, ville, code_postal, pays || 'France', wallet, lien);
+
+    res.json({ id: result.lastInsertRowid, message: 'Client créé avec succès' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Mettre à jour un client
 app.put('/api/clients/:id', (req, res) => {
   const { nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien } = req.body;
 
-  db.run(
-    `UPDATE clients
-     SET nom=?, prenom=?, email=?, telephone=?, adresse=?, ville=?, code_postal=?, pays=?, wallet=?, lien=?
-     WHERE id=?`,
-    [nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien, req.params.id],
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      res.json({ message: 'Client mis à jour', changes: this.changes });
-    }
-  );
+  try {
+    const result = db.prepare(
+      `UPDATE clients
+       SET nom=?, prenom=?, email=?, telephone=?, adresse=?, ville=?, code_postal=?, pays=?, wallet=?, lien=?
+       WHERE id=?`
+    ).run(nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien, req.params.id);
+
+    res.json({ message: 'Client mis à jour', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Supprimer un client
 app.delete('/api/clients/:id', (req, res) => {
-  db.run('DELETE FROM clients WHERE id = ?', [req.params.id], function(err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    res.json({ message: 'Client supprimé', changes: this.changes });
-  });
+  try {
+    const result = db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Client supprimé', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============= ROUTES PRODUITS =============
 
-// Récupérer tous les produits
 app.get('/api/produits', (req, res) => {
-  db.all('SELECT * FROM produits ORDER BY nom', [], (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
+  try {
+    const rows = db.prepare('SELECT * FROM produits ORDER BY nom').all();
     res.json(rows);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Créer un nouveau produit
 app.post('/api/produits', (req, res) => {
   const { nom, description, prix, poids, stock, dimension_id } = req.body;
 
-  db.run(
-    `INSERT INTO produits (nom, description, prix, poids, stock, dimension_id)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [nom, description, prix, poids, stock || 0, dimension_id || null],
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      res.json({ id: this.lastID, message: 'Produit créé avec succès' });
-    }
-  );
+  try {
+    const result = db.prepare(
+      `INSERT INTO produits (nom, description, prix, poids, stock, dimension_id)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(nom, description, prix, poids, stock || 0, dimension_id || null);
+
+    res.json({ id: result.lastInsertRowid, message: 'Produit créé avec succès' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Mettre à jour un produit
 app.put('/api/produits/:id', (req, res) => {
   const { nom, description, prix, poids, stock, dimension_id } = req.body;
 
-  db.run(
-    `UPDATE produits
-     SET nom=?, description=?, prix=?, poids=?, stock=?, dimension_id=?
-     WHERE id=?`,
-    [nom, description, prix, poids, stock, dimension_id || null, req.params.id],
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      res.json({ message: 'Produit mis à jour', changes: this.changes });
-    }
-  );
+  try {
+    const result = db.prepare(
+      `UPDATE produits
+       SET nom=?, description=?, prix=?, poids=?, stock=?, dimension_id=?
+       WHERE id=?`
+    ).run(nom, description, prix, poids, stock, dimension_id || null, req.params.id);
+
+    res.json({ message: 'Produit mis à jour', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Supprimer un produit
 app.delete('/api/produits/:id', (req, res) => {
-  db.run('DELETE FROM produits WHERE id = ?', [req.params.id], function(err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    res.json({ message: 'Produit supprimé', changes: this.changes });
-  });
+  try {
+    const result = db.prepare('DELETE FROM produits WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Produit supprimé', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============= ROUTES COLIS =============
 
-// Récupérer tous les colis avec infos client
 app.get('/api/colis', (req, res) => {
-  const query = `
-    SELECT c.*,
-           cl.nom as client_nom,
-           cl.prenom as client_prenom,
-           cl.email as client_email
-    FROM colis c
-    LEFT JOIN clients cl ON c.client_id = cl.id
-    ORDER BY c.date_creation DESC
-  `;
-
-  db.all(query, [], (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
+  try {
+    const rows = db.prepare(`
+      SELECT c.*,
+             cl.nom as client_nom,
+             cl.prenom as client_prenom,
+             cl.email as client_email
+      FROM colis c
+      LEFT JOIN clients cl ON c.client_id = cl.id
+      ORDER BY c.date_creation DESC
+    `).all();
     res.json(rows);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Récupérer un colis avec ses produits
 app.get('/api/colis/:id', (req, res) => {
-  const query = `
-    SELECT c.*,
-           cl.nom as client_nom,
-           cl.prenom as client_prenom,
-           cl.adresse as client_adresse,
-           cl.ville as client_ville,
-           cl.code_postal as client_code_postal,
-           cl.pays as client_pays
-    FROM colis c
-    LEFT JOIN clients cl ON c.client_id = cl.id
-    WHERE c.id = ?
-  `;
+  try {
+    const colis = db.prepare(`
+      SELECT c.*,
+             cl.nom as client_nom,
+             cl.prenom as client_prenom,
+             cl.adresse as client_adresse,
+             cl.ville as client_ville,
+             cl.code_postal as client_code_postal,
+             cl.pays as client_pays
+      FROM colis c
+      LEFT JOIN clients cl ON c.client_id = cl.id
+      WHERE c.id = ?
+    `).get(req.params.id);
 
-  db.get(query, [req.params.id], (err, colis) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-
-    // Récupérer les produits du colis
-    db.all(
+    const produits = db.prepare(
       `SELECT cp.*, p.nom, p.description, p.prix
        FROM colis_produits cp
        LEFT JOIN produits p ON cp.produit_id = p.id
-       WHERE cp.colis_id = ?`,
-      [req.params.id],
-      (err, produits) => {
-        if (err) {
-          res.status(500).json({ error: err.message });
-          return;
-        }
-        colis.produits = produits;
-        res.json(colis);
-      }
-    );
-  });
+       WHERE cp.colis_id = ?`
+    ).all(req.params.id);
+
+    colis.produits = produits;
+    res.json(colis);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Créer un nouveau colis
 app.post('/api/colis', (req, res) => {
   const {
     numero_suivi, client_id, statut, poids, dimensions, reference,
@@ -377,42 +315,33 @@ app.post('/api/colis', (req, res) => {
     notes, produits
   } = req.body;
 
-  // Générer un numéro de suivi si non fourni
   const tracking = numero_suivi || `COL${Date.now()}`;
 
-  db.run(
-    `INSERT INTO colis (numero_suivi, client_id, statut, poids, dimensions, reference,
-                        adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition,
-                        pays_expedition, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [tracking, client_id, statut || 'En préparation', poids, dimensions, reference,
-     adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition,
-     pays_expedition || 'France', notes],
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
+  try {
+    const result = db.prepare(
+      `INSERT INTO colis (numero_suivi, client_id, statut, poids, dimensions, reference,
+                          adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition,
+                          pays_expedition, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(tracking, client_id, statut || 'En préparation', poids, dimensions, reference,
+          adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition,
+          pays_expedition || 'France', notes);
 
-      const colisId = this.lastID;
+    const colisId = result.lastInsertRowid;
 
-      // Ajouter les produits si fournis
-      if (produits && produits.length > 0) {
-        const stmt = db.prepare('INSERT INTO colis_produits (colis_id, produit_id, quantite) VALUES (?, ?, ?)');
-
-        produits.forEach(p => {
-          stmt.run(colisId, p.produit_id, p.quantite || 1);
-        });
-
-        stmt.finalize();
-      }
-
-      res.json({ id: colisId, numero_suivi: tracking, message: 'Colis créé avec succès' });
+    if (produits && produits.length > 0) {
+      const stmt = db.prepare('INSERT INTO colis_produits (colis_id, produit_id, quantite) VALUES (?, ?, ?)');
+      produits.forEach(p => {
+        stmt.run(colisId, p.produit_id, p.quantite || 1);
+      });
     }
-  );
+
+    res.json({ id: colisId, numero_suivi: tracking, message: 'Colis créé avec succès' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Mettre à jour un colis
 app.put('/api/colis/:id', (req, res) => {
   const {
     client_id, numero_suivi, statut, poids, dimensions, reference,
@@ -420,34 +349,30 @@ app.put('/api/colis/:id', (req, res) => {
     date_expedition, date_livraison, notes
   } = req.body;
 
-  db.run(
-    `UPDATE colis
-     SET client_id=?, numero_suivi=?, statut=?, poids=?, dimensions=?, reference=?,
-         adresse_expedition=?, adresse_ligne2=?, ville_expedition=?, code_postal_expedition=?, pays_expedition=?,
-         date_expedition=?, date_livraison=?, notes=?
-     WHERE id=?`,
-    [client_id, numero_suivi, statut, poids, dimensions, reference,
-     adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
-     date_expedition, date_livraison, notes, req.params.id],
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      res.json({ message: 'Colis mis à jour', changes: this.changes });
-    }
-  );
+  try {
+    const result = db.prepare(
+      `UPDATE colis
+       SET client_id=?, numero_suivi=?, statut=?, poids=?, dimensions=?, reference=?,
+           adresse_expedition=?, adresse_ligne2=?, ville_expedition=?, code_postal_expedition=?, pays_expedition=?,
+           date_expedition=?, date_livraison=?, notes=?
+       WHERE id=?`
+    ).run(client_id, numero_suivi, statut, poids, dimensions, reference,
+          adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
+          date_expedition, date_livraison, notes, req.params.id);
+
+    res.json({ message: 'Colis mis à jour', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Supprimer un colis
 app.delete('/api/colis/:id', (req, res) => {
-  db.run('DELETE FROM colis WHERE id = ?', [req.params.id], function(err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    res.json({ message: 'Colis supprimé', changes: this.changes });
-  });
+  try {
+    const result = db.prepare('DELETE FROM colis WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Colis supprimé', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============= GÉNÉRATION D'ÉTIQUETTES PDF =============
@@ -456,32 +381,24 @@ app.post('/api/etiquettes/pdf', (req, res) => {
   const { colisIds, logoData } = req.body;
 
   if (!colisIds || colisIds.length === 0) {
-    res.status(400).json({ error: 'Aucun colis sélectionné' });
-    return;
+    return res.status(400).json({ error: 'Aucun colis sélectionné' });
   }
 
-  // Récupérer les infos des colis
-  const placeholders = colisIds.map(() => '?').join(',');
-  const query = `
-    SELECT c.*,
-           cl.nom as client_nom,
-           cl.prenom as client_prenom,
-           cl.adresse as client_adresse,
-           cl.ville as client_ville,
-           cl.code_postal as client_code_postal,
-           cl.pays as client_pays
-    FROM colis c
-    LEFT JOIN clients cl ON c.client_id = cl.id
-    WHERE c.id IN (${placeholders})
-  `;
+  try {
+    const placeholders = colisIds.map(() => '?').join(',');
+    const colisList = db.prepare(`
+      SELECT c.*,
+             cl.nom as client_nom,
+             cl.prenom as client_prenom,
+             cl.adresse as client_adresse,
+             cl.ville as client_ville,
+             cl.code_postal as client_code_postal,
+             cl.pays as client_pays
+      FROM colis c
+      LEFT JOIN clients cl ON c.client_id = cl.id
+      WHERE c.id IN (${placeholders})
+    `).all(...colisIds);
 
-  db.all(query, colisIds, (err, colisList) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-
-    // Créer le PDF en format A4 sans marge
     const doc = new PDFDocument({ size: 'A4', margin: 0 });
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -489,32 +406,26 @@ app.post('/api/etiquettes/pdf', (req, res) => {
 
     doc.pipe(res);
 
-    // Dimensions pour 6 étiquettes par page (2 colonnes x 3 lignes)
-    const pageWidth = 595; // A4 width in points
-    const pageHeight = 842; // A4 height in points
-    const labelWidth = pageWidth / 2; // 297.5 points
-    const labelHeight = pageHeight / 3; // ~280.67 points
-    const margin = 10; // Marge interne de chaque étiquette
+    const pageWidth = 595;
+    const pageHeight = 842;
+    const labelWidth = pageWidth / 2;
+    const labelHeight = pageHeight / 3;
+    const margin = 10;
 
     colisList.forEach((colis, index) => {
-      // Calculer la position sur la page
-      const pageIndex = Math.floor(index / 6);
       const positionOnPage = index % 6;
       const col = positionOnPage % 2;
       const row = Math.floor(positionOnPage / 2);
 
-      // Créer une nouvelle page tous les 6 colis
       if (index > 0 && positionOnPage === 0) {
         doc.addPage();
       }
 
-      // Calculer les coordonnées de départ de l'étiquette
       const startX = col * labelWidth;
       const startY = row * labelHeight;
 
       let currentY = startY + margin + 8;
 
-      // Logo (si disponible)
       if (logoData) {
         try {
           const logoBuffer = Buffer.from(logoData.split(',')[1], 'base64');
@@ -529,7 +440,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
         }
       }
 
-      // ===== NUMÉRO DE SUIVI =====
       doc.fontSize(8)
          .font('Helvetica')
          .text('NUMÉRO DE SUIVI', startX + margin, currentY, {
@@ -546,7 +456,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
          });
       currentY += 15;
 
-      // Code-barres stylisé
       doc.fontSize(9)
          .font('Courier-Bold')
          .text(`|||  ${colis.numero_suivi || 'N/A'}  |||`, startX + margin, currentY, {
@@ -555,7 +464,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
          });
       currentY += 15;
 
-      // Ligne de séparation épaisse
       doc.strokeColor('#000000')
          .lineWidth(2)
          .moveTo(startX + margin, currentY)
@@ -564,7 +472,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
          .lineWidth(1);
       currentY += 8;
 
-      // ===== DESTINATAIRE =====
       doc.fontSize(9)
          .font('Helvetica-Bold')
          .fillColor('#2563eb')
@@ -572,7 +479,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
            width: labelWidth - 2 * margin
          });
 
-      // Soulignement du titre en bleu
       const destTitleWidth = doc.widthOfString('DESTINATAIRE');
       doc.strokeColor('#2563eb')
          .lineWidth(1.5)
@@ -583,7 +489,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
          .strokeColor('#000000');
       currentY += 18;
 
-      // Nom + Prénom (en gros et gras)
       doc.fontSize(12)
          .font('Helvetica-Bold')
          .fillColor('#000000')
@@ -595,7 +500,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
          );
       currentY += 16;
 
-      // Adresse ligne 1
       doc.fontSize(10)
          .font('Helvetica')
          .text(
@@ -606,7 +510,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
          );
       currentY += 13;
 
-      // Adresse ligne 2 (si présente)
       if (colis.adresse_ligne2) {
         doc.text(
           colis.adresse_ligne2,
@@ -617,7 +520,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
         currentY += 13;
       }
 
-      // Code postal + Ville (en gras)
       doc.fontSize(11)
          .font('Helvetica-Bold')
          .text(
@@ -628,7 +530,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
          );
       currentY += 14;
 
-      // Pays
       const pays = colis.pays_expedition || colis.client_pays || 'France';
       doc.fontSize(9)
          .font('Helvetica')
@@ -636,7 +537,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
          .text(pays, startX + margin, currentY, { width: labelWidth - 2 * margin });
       currentY += 18;
 
-      // Ligne de séparation
       doc.strokeColor('#cccccc')
          .lineWidth(0.5)
          .moveTo(startX + margin, currentY)
@@ -646,11 +546,9 @@ app.post('/api/etiquettes/pdf', (req, res) => {
          .lineWidth(1);
       currentY += 8;
 
-      // ===== INFORMATIONS COLIS =====
       const leftCol = startX + margin;
       const rightCol = startX + margin + (labelWidth - 2 * margin) / 2 + 5;
 
-      // Poids
       doc.fontSize(7)
          .font('Helvetica')
          .fillColor('#666666')
@@ -663,7 +561,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
            width: (labelWidth - 2 * margin) / 2 - 5
          });
 
-      // Dimensions
       doc.fontSize(7)
          .fillColor('#666666')
          .font('Helvetica')
@@ -678,7 +575,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
 
       currentY += 30;
 
-      // Référence (soulignée en vert)
       if (colis.reference) {
         doc.fontSize(10)
            .fillColor('#059669')
@@ -692,114 +588,82 @@ app.post('/api/etiquettes/pdf', (req, res) => {
     });
 
     doc.end();
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============= ROUTES DIMENSIONS =============
 
-// Récupérer toutes les dimensions
 app.get('/api/dimensions', (req, res) => {
-  db.all('SELECT * FROM dimensions ORDER BY longueur ASC', [], (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
+  try {
+    const rows = db.prepare('SELECT * FROM dimensions ORDER BY longueur ASC').all();
     res.json(rows);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Créer une nouvelle dimension
 app.post('/api/dimensions', (req, res) => {
   const { nom, longueur, largeur, hauteur, is_default } = req.body;
 
-  db.run(
-    `INSERT INTO dimensions (nom, longueur, largeur, hauteur, is_default)
-     VALUES (?, ?, ?, ?, ?)`,
-    [nom, longueur, largeur, hauteur, is_default ? 1 : 0],
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      res.json({ id: this.lastID, message: 'Dimension créée avec succès' });
-    }
-  );
+  try {
+    const result = db.prepare(
+      `INSERT INTO dimensions (nom, longueur, largeur, hauteur, is_default)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(nom, longueur, largeur, hauteur, is_default ? 1 : 0);
+
+    res.json({ id: result.lastInsertRowid, message: 'Dimension créée avec succès' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Mettre à jour une dimension
 app.put('/api/dimensions/:id', (req, res) => {
   const { nom, longueur, largeur, hauteur, is_default } = req.body;
 
-  db.run(
-    `UPDATE dimensions
-     SET nom=?, longueur=?, largeur=?, hauteur=?, is_default=?
-     WHERE id=?`,
-    [nom, longueur, largeur, hauteur, is_default ? 1 : 0, req.params.id],
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      res.json({ message: 'Dimension mise à jour', changes: this.changes });
-    }
-  );
+  try {
+    const result = db.prepare(
+      `UPDATE dimensions
+       SET nom=?, longueur=?, largeur=?, hauteur=?, is_default=?
+       WHERE id=?`
+    ).run(nom, longueur, largeur, hauteur, is_default ? 1 : 0, req.params.id);
+
+    res.json({ message: 'Dimension mise à jour', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Supprimer une dimension
 app.delete('/api/dimensions/:id', (req, res) => {
-  // D'abord, retirer cette dimension des produits qui l'utilisent
-  db.run('UPDATE produits SET dimension_id = NULL WHERE dimension_id = ?', [req.params.id], function(err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-
-    // Ensuite supprimer la dimension
-    db.run('DELETE FROM dimensions WHERE id = ?', [req.params.id], function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      res.json({ message: 'Dimension supprimée', changes: this.changes });
-    });
-  });
+  try {
+    db.prepare('UPDATE produits SET dimension_id = NULL WHERE dimension_id = ?').run(req.params.id);
+    const result = db.prepare('DELETE FROM dimensions WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Dimension supprimée', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============= STATISTIQUES =============
 
 app.get('/api/stats', (req, res) => {
-  const stats = {};
-
-  db.get('SELECT COUNT(*) as count FROM clients', [], (err, row) => {
-    stats.clients = row ? row.count : 0;
-
-    db.get('SELECT COUNT(*) as count FROM produits', [], (err, row) => {
-      stats.produits = row ? row.count : 0;
-
-      db.get('SELECT COUNT(*) as count FROM colis', [], (err, row) => {
-        stats.colis = row ? row.count : 0;
-
-        // Compter les colis en attente (En préparation, Out of stock, Incomplet)
-        db.get("SELECT COUNT(*) as count FROM colis WHERE statut IN ('En préparation', 'Out of stock', 'Incomplet')", [], (err, row) => {
-          stats.colisEnPreparation = row ? row.count : 0;
-
-          db.get("SELECT COUNT(*) as count FROM colis WHERE statut='Envoyé'", [], (err, row) => {
-            stats.colisEnvoyes = row ? row.count : 0;
-
-            db.get("SELECT COUNT(*) as count FROM colis WHERE statut='Out of stock'", [], (err, row) => {
-              stats.colisOutOfStock = row ? row.count : 0;
-              res.json(stats);
-            });
-          });
-        });
-      });
-    });
-  });
+  try {
+    const stats = {};
+    stats.clients = db.prepare('SELECT COUNT(*) as count FROM clients').get().count;
+    stats.produits = db.prepare('SELECT COUNT(*) as count FROM produits').get().count;
+    stats.colis = db.prepare('SELECT COUNT(*) as count FROM colis').get().count;
+    stats.colisEnPreparation = db.prepare("SELECT COUNT(*) as count FROM colis WHERE statut IN ('En préparation', 'Out of stock', 'Incomplet')").get().count;
+    stats.colisEnvoyes = db.prepare("SELECT COUNT(*) as count FROM colis WHERE statut='Envoyé'").get().count;
+    stats.colisOutOfStock = db.prepare("SELECT COUNT(*) as count FROM colis WHERE statut='Out of stock'").get().count;
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============= EXPORT / RESET DATABASE =============
 
-// Exporter la base de données
 app.get('/api/database/export', (req, res) => {
   const dbPath = path.join(__dirname, 'crm.db');
 
@@ -815,7 +679,6 @@ app.get('/api/database/export', (req, res) => {
   });
 });
 
-// Importer la base de données
 app.post('/api/database/import', upload.single('dbFile'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Aucun fichier uploadé' });
@@ -825,31 +688,17 @@ app.post('/api/database/import', upload.single('dbFile'), (req, res) => {
   const dbPath = path.join(__dirname, 'crm.db');
 
   try {
-    // Fermer la connexion actuelle à la base de données
-    db.close((err) => {
-      if (err) {
-        console.error('Erreur fermeture DB:', err);
-      }
+    // Fermer la connexion actuelle
+    db.close();
 
-      // Copier le fichier uploadé pour remplacer la base de données
-      fs.copyFileSync(uploadedPath, dbPath);
+    // Copier le fichier uploadé
+    fs.copyFileSync(uploadedPath, dbPath);
+    fs.unlinkSync(uploadedPath);
 
-      // Supprimer le fichier temporaire
-      fs.unlinkSync(uploadedPath);
-
-      // Réouvrir la connexion à la base de données
-      const sqlite3 = require('sqlite3').verbose();
-      const newDb = new sqlite3.Database(dbPath);
-
-      // Mettre à jour la référence globale
-      Object.assign(db, newDb);
-
-      res.json({ message: 'Base de données importée avec succès' });
-    });
+    res.json({ message: 'Base de données importée avec succès. Veuillez redémarrer l\'application.' });
   } catch (error) {
     console.error('Erreur import base de données:', error);
 
-    // Nettoyer le fichier temporaire en cas d'erreur
     if (fs.existsSync(uploadedPath)) {
       fs.unlinkSync(uploadedPath);
     }
@@ -858,32 +707,18 @@ app.post('/api/database/import', upload.single('dbFile'), (req, res) => {
   }
 });
 
-// Réinitialiser la base de données
 app.post('/api/database/reset', (req, res) => {
-  const tables = ['colis_produits', 'colis', 'produits', 'clients'];
-
-  let completedCount = 0;
-  const errors = [];
-
-  tables.forEach(table => {
-    db.run(`DELETE FROM ${table}`, [], function(err) {
-      if (err) {
-        errors.push({ table, error: err.message });
-      }
-      completedCount++;
-
-      if (completedCount === tables.length) {
-        if (errors.length > 0) {
-          res.status(500).json({ error: 'Erreur lors de la réinitialisation', details: errors });
-        } else {
-          res.json({ message: 'Base de données réinitialisée avec succès' });
-        }
-      }
+  try {
+    const tables = ['colis_produits', 'colis', 'produits', 'clients'];
+    tables.forEach(table => {
+      db.prepare(`DELETE FROM ${table}`).run();
     });
-  });
+    res.json({ message: 'Base de données réinitialisée avec succès' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur lors de la réinitialisation: ' + err.message });
+  }
 });
 
-// Initialiser avec des données de test
 app.post('/api/database/init-test-data', (req, res) => {
   const { exec } = require('child_process');
 
