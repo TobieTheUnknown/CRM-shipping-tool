@@ -13,6 +13,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python setuptools
+        run: pip install setuptools
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -22,8 +30,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install electron-rebuild
+        run: npm install -g @electron/rebuild
+
       - name: Rebuild native modules for Electron
-        run: npm rebuild sqlite3
+        run: npx @electron/rebuild -f -w sqlite3
 
       - name: Build macOS DMG
         run: npm run build:mac
@@ -42,6 +53,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python setuptools
+        run: pip install setuptools
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -51,8 +70,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install electron-rebuild
+        run: npm install -g @electron/rebuild
+
       - name: Rebuild native modules for Electron
-        run: npm rebuild sqlite3
+        run: npx @electron/rebuild -f -w sqlite3
 
       - name: Build Windows installer
         run: npm run build:win
@@ -71,6 +93,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python setuptools
+        run: pip install setuptools
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -80,8 +110,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install electron-rebuild
+        run: npm install -g @electron/rebuild
+
       - name: Rebuild native modules for Electron
-        run: npm rebuild sqlite3
+        run: npx @electron/rebuild -f -w sqlite3
 
       - name: Build Linux packages
         run: npm run build:linux
