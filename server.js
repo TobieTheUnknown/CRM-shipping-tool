@@ -628,23 +628,12 @@ app.post('/api/etiquettes/pdf', (req, res) => {
          );
       currentY += 14;
 
-      // Pays (en couleur si différent de France)
+      // Pays
       const pays = colis.pays_expedition || colis.client_pays || 'France';
-      if (pays.toLowerCase() !== 'france') {
-        doc.fontSize(10)
-           .font('Helvetica-Bold')
-           .fillColor('#dc2626')
-           .text(pays, startX + margin, currentY, {
-             width: labelWidth - 2 * margin,
-             underline: true
-           })
-           .fillColor('#000000');
-      } else {
-        doc.fontSize(9)
-           .font('Helvetica')
-           .fillColor('#000000')
-           .text(pays, startX + margin, currentY, { width: labelWidth - 2 * margin });
-      }
+      doc.fontSize(9)
+         .font('Helvetica')
+         .fillColor('#000000')
+         .text(pays, startX + margin, currentY, { width: labelWidth - 2 * margin });
       currentY += 18;
 
       // Ligne de séparation
