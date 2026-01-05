@@ -350,6 +350,9 @@ function parseQuickClient() {
 }
 
 function smartParseClientInfo(text) {
+    // Nettoyer le texte : retirer les guillemets
+    text = text.replace(/["«»""]/g, '');
+
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const data = {
         nom: '',
@@ -529,6 +532,43 @@ async function confirmQuickClient() {
         console.error('Erreur création client:', error);
         alert('Erreur lors de la création du client');
     }
+}
+
+function toggleQuickFillClient() {
+    const section = document.getElementById('quickFillClientSection');
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+    } else {
+        section.style.display = 'none';
+    }
+}
+
+function parseAndFillClientForm() {
+    const input = document.getElementById('quickFillClientInput').value.trim();
+
+    if (!input) {
+        alert('Veuillez entrer des informations');
+        return;
+    }
+
+    // Parser les infos
+    const data = smartParseClientInfo(input);
+
+    // Remplir le formulaire
+    document.getElementById('clientNom').value = data.nom || '';
+    document.getElementById('clientPrenom').value = data.prenom || '';
+    document.getElementById('clientEmail').value = data.email || '';
+    document.getElementById('clientTelephone').value = data.telephone || '';
+    document.getElementById('clientAdresse').value = data.adresse || '';
+    document.getElementById('clientVille').value = data.ville || '';
+    document.getElementById('clientCodePostal').value = data.code_postal || '';
+    document.getElementById('clientPays').value = data.pays || 'France';
+
+    // Vider le textarea et cacher la section
+    document.getElementById('quickFillClientInput').value = '';
+    document.getElementById('quickFillClientSection').style.display = 'none';
+
+    alert('✅ Champs remplis automatiquement ! Vérifiez et complétez si nécessaire.');
 }
 
 // ============= GESTION WALLETS/LIENS MULTIPLES =============

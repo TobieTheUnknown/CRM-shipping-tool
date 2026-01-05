@@ -272,6 +272,20 @@
         <div class="modal-content">
             <span class="close" onclick="closeModal('modalClient')">&times;</span>
             <h2>Nouveau Client</h2>
+
+            <!-- Option de remplissage automatique -->
+            <div style="margin-bottom: 20px; padding: 10px; background: #f0f7ff; border-radius: 8px;">
+                <button type="button" class="btn btn-secondary btn-small" onclick="toggleQuickFillClient()" style="width: 100%;">
+                    🔍 Remplissage automatique (coller des infos en vrac)
+                </button>
+                <div id="quickFillClientSection" style="display: none; margin-top: 15px;">
+                    <textarea id="quickFillClientInput" rows="6" placeholder="Collez les infos du client ici...&#10;Exemple:&#10;John Doe&#10;123 Main Street&#10;75001 Paris, France&#10;john.doe@example.com&#10;0601020304" style="width: 100%; font-family: monospace; font-size: 13px; padding: 10px; border: 1px solid #ddd; border-radius: 5px;"></textarea>
+                    <button type="button" class="btn btn-primary btn-small" onclick="parseAndFillClientForm()" style="margin-top: 10px;">
+                        ✨ Analyser et remplir les champs
+                    </button>
+                </div>
+            </div>
+
             <form id="formClient" onsubmit="saveClient(event)">
                 <input type="hidden" id="clientId">
                 <div class="form-group">
@@ -487,7 +501,7 @@
 
             <div class="form-group">
                 <label>Informations du client</label>
-                <textarea id="quickClientInput" rows="8" placeholder="Exemple:&#10;Marwane Khyar&#10;9 rue du docteur Roger galbrun&#10;77170 Brie comte robert, France&#10;Khyar.m@gmail.com&#10;0609519225" style="font-family: monospace; font-size: 13px;"></textarea>
+                <textarea id="quickClientInput" rows="8" placeholder="Exemple:&#10;John Doe&#10;123 Main Street&#10;75001 Paris, France&#10;john.doe@example.com&#10;0601020304" style="font-family: monospace; font-size: 13px;"></textarea>
             </div>
 
             <div style="text-align: center; margin: 15px 0;">
