@@ -16,22 +16,22 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initTabs() {
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    tabButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tabId = btn.getAttribute('data-tab');
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const tabId = item.getAttribute('data-tab');
             switchTab(tabId);
         });
     });
 }
 
 function switchTab(tabId) {
-    // Désactiver tous les tabs
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    // Désactiver tous les nav items et tabs
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
-    // Activer le tab sélectionné
-    document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+    // Activer le nav item et tab sélectionnés
+    document.querySelector(`.nav-item[data-tab="${tabId}"]`).classList.add('active');
     document.getElementById(`tab-${tabId}`).classList.add('active');
 }
 
@@ -42,10 +42,10 @@ async function loadStats() {
         const response = await fetch(`${API_URL}/api/stats`);
         const stats = await response.json();
 
-        document.getElementById('statClients').textContent = stats.clients || 0;
-        document.getElementById('statProduits').textContent = stats.produits || 0;
-        document.getElementById('statColis').textContent = stats.colis || 0;
-        document.getElementById('statEnPreparation').textContent = stats.colisEnPreparation || 0;
+        // Update sidebar stats
+        document.getElementById('statClientsSidebar').textContent = stats.clients || 0;
+        document.getElementById('statColisSidebar').textContent = stats.colis || 0;
+        document.getElementById('statPrepSidebar').textContent = stats.colisEnPreparation || 0;
     } catch (error) {
         console.error('Erreur chargement stats:', error);
     }

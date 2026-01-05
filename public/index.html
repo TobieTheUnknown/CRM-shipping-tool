@@ -3,248 +3,290 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRM Shipping Tool - Gestion de Colis</title>
+    <title>ShipTrack - CRM Logistics</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>📦 CRM Shipping Tool</h1>
-            <div class="stats" id="statsContainer">
-                <div class="stat-card">
-                    <span class="stat-value" id="statClients">0</span>
-                    <span class="stat-label">Clients</span>
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">📦</div>
+                    <div class="logo-text">ShipTrack</div>
                 </div>
-                <div class="stat-card">
-                    <span class="stat-value" id="statProduits">0</span>
-                    <span class="stat-label">Produits</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value" id="statColis">0</span>
-                    <span class="stat-label">Colis</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value" id="statEnPreparation">0</span>
-                    <span class="stat-label">En préparation</span>
-                </div>
-            </div>
-        </header>
-
-        <nav class="tabs">
-            <button class="tab-btn active" data-tab="planning">Planning</button>
-            <button class="tab-btn" data-tab="colis">Colis</button>
-            <button class="tab-btn" data-tab="clients">Clients</button>
-            <button class="tab-btn" data-tab="produits">Produits</button>
-        </nav>
-
-        <!-- TAB PLANNING -->
-        <div id="tab-planning" class="tab-content active">
-            <div class="planning-header">
-                <h2>📋 Import CSV Planning</h2>
-                <p>Importez vos colis en masse via un fichier CSV</p>
+                <div class="logo-subtitle">Logistics CRM</div>
             </div>
 
-            <div class="csv-upload-section">
-                <div class="upload-card">
-                    <div class="upload-icon">📄</div>
-                    <h3>Format CSV attendu</h3>
-                    <p>Colonnes requises :</p>
-                    <ul class="csv-columns">
-                        <li><strong>Item</strong> - Nom de l'article</li>
-                        <li><strong>Lien</strong> - Lien vers l'article</li>
-                        <li><strong>Prix Objet (€)</strong> - Prix en euros</li>
-                        <li><strong>Poids (kg)</strong> - Poids du colis</li>
-                        <li><strong>Adresse d'envoi</strong> - Adresse complète</li>
-                        <li><strong>Lien de suivi colis</strong> - Numéro de suivi</li>
-                        <li><strong>Photos/Vidéos associées</strong> - Liens médias</li>
-                        <li><strong>Statut</strong> - État du colis</li>
-                        <li><strong>Timestamp</strong> - Date de création</li>
-                        <li><strong>N° Colis/mois</strong> - Référence</li>
-                        <li><strong>Note</strong> - Notes additionnelles</li>
-                    </ul>
+            <div class="stats-sidebar">
+                <div class="stat-mini">
+                    <span class="stat-mini-label">Clients</span>
+                    <span class="stat-mini-value" id="statClientsSidebar">0</span>
+                </div>
+                <div class="stat-mini">
+                    <span class="stat-mini-label">Colis actifs</span>
+                    <span class="stat-mini-value" id="statColisSidebar">0</span>
+                </div>
+                <div class="stat-mini">
+                    <span class="stat-mini-label">En préparation</span>
+                    <span class="stat-mini-value" id="statPrepSidebar">0</span>
+                </div>
+            </div>
+
+            <nav class="nav">
+                <div class="nav-item active" data-tab="planning">
+                    <span class="nav-icon">📋</span>
+                    <span>Planning</span>
+                </div>
+                <div class="nav-item" data-tab="colis">
+                    <span class="nav-icon">📦</span>
+                    <span>Colis</span>
+                </div>
+                <div class="nav-item" data-tab="clients">
+                    <span class="nav-icon">👥</span>
+                    <span>Clients</span>
+                </div>
+                <div class="nav-item" data-tab="produits">
+                    <span class="nav-icon">🏷️</span>
+                    <span>Produits</span>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <!-- TAB PLANNING -->
+            <div id="tab-planning" class="tab-content active">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Import CSV Planning</h1>
+                        <p class="page-subtitle">Importez vos colis en masse via un fichier CSV</p>
+                    </div>
                 </div>
 
-                <div class="upload-card">
-                    <h3>📤 Importer votre fichier</h3>
-                    <form id="csvUploadForm" onsubmit="uploadCSV(event)">
-                        <div class="file-input-wrapper">
-                            <input type="file" id="csvFile" accept=".csv" required>
-                            <label for="csvFile" class="file-label">
-                                <span id="fileNameDisplay">Choisir un fichier CSV...</span>
-                            </label>
+                <div class="csv-upload-section">
+                    <div class="upload-card">
+                        <div class="upload-icon">📄</div>
+                        <h3>Format CSV attendu</h3>
+                        <p style="margin-bottom: 16px; color: var(--text-secondary);">Colonnes requises :</p>
+                        <ul class="csv-columns">
+                            <li><strong>Item</strong> - Nom de l'article</li>
+                            <li><strong>Lien</strong> - Lien vers l'article</li>
+                            <li><strong>Prix Objet (€)</strong> - Prix en euros</li>
+                            <li><strong>Poids (kg)</strong> - Poids du colis</li>
+                            <li><strong>Adresse d'envoi</strong> - Adresse complète</li>
+                            <li><strong>Lien de suivi colis</strong> - Numéro de suivi</li>
+                            <li><strong>Photos/Vidéos associées</strong> - Liens médias</li>
+                            <li><strong>Statut</strong> - État du colis</li>
+                            <li><strong>Timestamp</strong> - Date de création</li>
+                            <li><strong>N° Colis/mois</strong> - Référence</li>
+                            <li><strong>Note</strong> - Notes additionnelles</li>
+                        </ul>
+                    </div>
+
+                    <div class="upload-card">
+                        <h3>📤 Importer votre fichier</h3>
+                        <form id="csvUploadForm" onsubmit="uploadCSV(event)">
+                            <div class="file-input-wrapper">
+                                <input type="file" id="csvFile" accept=".csv" required>
+                                <label for="csvFile" class="file-label">
+                                    <span id="fileNameDisplay">Choisir un fichier CSV...</span>
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-large" id="uploadBtn">
+                                ⬆️ Importer le CSV
+                            </button>
+                        </form>
+
+                        <div id="importResult" class="import-result" style="display: none;">
+                            <h4>Résultat de l'import</h4>
+                            <div id="importResultContent"></div>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-large" id="uploadBtn">
-                            ⬆️ Importer le CSV
-                        </button>
-                    </form>
+                    </div>
+                </div>
 
-                    <div id="importResult" class="import-result" style="display: none;">
-                        <h4>Résultat de l'import</h4>
-                        <div id="importResultContent"></div>
+                <div class="csv-example">
+                    <h3>📝 Exemple de fichier CSV</h3>
+                    <button class="btn btn-secondary" onclick="downloadExampleCSV()" style="margin-top: 12px;">
+                        💾 Télécharger un modèle CSV
+                    </button>
+                </div>
+
+                <!-- CONFIGURATION LOGO -->
+                <div class="database-tools">
+                    <h3>🖼️ Configuration Logo pour Étiquettes</h3>
+                    <p style="text-align: center; color: var(--text-secondary); margin-bottom: 15px; font-size: 13px;">
+                        Logo affiché sur les étiquettes d'expédition (format horizontal recommandé)
+                    </p>
+                    <div class="logo-upload-section">
+                        <div id="logoPreview" class="logo-preview">
+                            <img id="logoImage" src="" alt="Logo" style="display: none; max-width: 100%; max-height: 80px;">
+                            <p id="logoPlaceholder">Aucun logo configuré</p>
+                        </div>
+                        <div class="logo-actions">
+                            <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/jpg" style="display: none;" onchange="uploadLogo()">
+                            <button class="btn btn-primary" onclick="document.getElementById('logoFileInput').click()">
+                                📤 Choisir un logo
+                            </button>
+                            <button class="btn btn-danger" onclick="removeLogo()" id="btnRemoveLogo" style="display: none;">
+                                🗑️ Supprimer le logo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OUTILS BASE DE DONNÉES -->
+                <div class="database-tools">
+                    <h3>🛠️ Outils de base de données</h3>
+                    <div class="tools-buttons">
+                        <button class="btn btn-success" onclick="initTestData()">
+                            🎲 Charger des données de test
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportDatabase()">
+                            💾 Exporter la base de données
+                        </button>
+                        <button class="btn btn-danger" onclick="resetDatabase()">
+                            🗑️ Réinitialiser la base de données
+                        </button>
+                    </div>
+                    <div id="dbToolsResult" class="import-result" style="display: none;">
+                        <div id="dbToolsResultContent"></div>
                     </div>
                 </div>
             </div>
 
-            <div class="csv-example">
-                <h3>📝 Exemple de fichier CSV</h3>
-                <button class="btn btn-secondary" onclick="downloadExampleCSV()">
-                    💾 Télécharger un modèle CSV
-                </button>
-            </div>
-
-            <!-- CONFIGURATION LOGO -->
-            <div class="database-tools">
-                <h3>🖼️ Configuration Logo pour Étiquettes</h3>
-                <p style="text-align: center; color: #666; margin-bottom: 15px;">
-                    Logo affiché sur les étiquettes d'expédition (format horizontal recommandé)
-                </p>
-                <div class="logo-upload-section">
-                    <div id="logoPreview" class="logo-preview">
-                        <img id="logoImage" src="" alt="Logo" style="display: none; max-width: 100%; max-height: 80px;">
-                        <p id="logoPlaceholder">Aucun logo configuré</p>
-                    </div>
-                    <div class="logo-actions">
-                        <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/jpg" style="display: none;" onchange="uploadLogo()">
-                        <button class="btn btn-primary" onclick="document.getElementById('logoFileInput').click()">
-                            📤 Choisir un logo
-                        </button>
-                        <button class="btn btn-danger" onclick="removeLogo()" id="btnRemoveLogo" style="display: none;">
-                            🗑️ Supprimer le logo
-                        </button>
+            <!-- TAB COLIS -->
+            <div id="tab-colis" class="tab-content">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Gestion des Colis</h1>
+                        <p class="page-subtitle">Suivi et gestion de vos envois</p>
                     </div>
                 </div>
-            </div>
 
-            <!-- OUTILS BASE DE DONNÉES -->
-            <div class="database-tools">
-                <h3>🛠️ Outils de base de données</h3>
-                <div class="tools-buttons">
-                    <button class="btn btn-success" onclick="initTestData()">
-                        🎲 Charger des données de test
-                    </button>
-                    <button class="btn btn-secondary" onclick="exportDatabase()">
-                        💾 Exporter la base de données
-                    </button>
-                    <button class="btn btn-danger" onclick="resetDatabase()">
-                        🗑️ Réinitialiser la base de données
+                <div class="actions-bar">
+                    <button class="btn btn-primary" onclick="showAddColisModal()">+ Nouveau Colis</button>
+                    <button class="btn btn-success" onclick="imprimerEtiquettesSelection()" id="btnImprimerSelection" disabled>
+                        🖨️ Imprimer Étiquettes (<span id="selectedCount">0</span>)
                     </button>
                 </div>
-                <div id="dbToolsResult" class="import-result" style="display: none;">
-                    <div id="dbToolsResultContent"></div>
+
+                <!-- COLIS EN ATTENTE -->
+                <div class="colis-section">
+                    <h3 class="section-title">📦 Colis en attente (<span id="countEnAttente">0</span>)</h3>
+                    <div class="table-container">
+                        <table class="colisTable">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('attente')"></th>
+                                    <th>Date</th>
+                                    <th>Produit</th>
+                                    <th>Client / Adresse</th>
+                                    <th>Statut</th>
+                                    <th>Poids</th>
+                                    <th>N° Suivi</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="colisEnAttenteBody">
+                                <tr><td colspan="8" class="empty">Aucun colis en attente</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- COLIS ENVOYÉS -->
+                <div class="colis-section">
+                    <h3 class="section-title collapsible" onclick="toggleSection('expedies')">
+                        📫 Colis envoyés (<span id="countExpedies">0</span>)
+                        <span class="toggle-icon" id="toggleExpedies">▼</span>
+                    </h3>
+                    <div class="table-container" id="sectionExpedies">
+                        <table class="colisTable">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('expedies')"></th>
+                                    <th>Date</th>
+                                    <th>Produit</th>
+                                    <th>Client / Adresse</th>
+                                    <th>Statut</th>
+                                    <th>Poids</th>
+                                    <th>N° Suivi</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="colisExpediesBody">
+                                <tr><td colspan="8" class="empty">Aucun colis envoyé</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- TAB COLIS -->
-        <div id="tab-colis" class="tab-content">
-            <div class="actions-bar">
-                <button class="btn btn-primary" onclick="showAddColisModal()">+ Nouveau Colis</button>
-                <button class="btn btn-success" onclick="imprimerEtiquettesSelection()" id="btnImprimerSelection" disabled>
-                    🖨️ Imprimer Étiquettes (<span id="selectedCount">0</span>)
-                </button>
-            </div>
+            <!-- TAB CLIENTS -->
+            <div id="tab-clients" class="tab-content">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Clients</h1>
+                        <p class="page-subtitle">Gestion de votre base clients</p>
+                    </div>
+                </div>
 
-            <!-- COLIS EN ATTENTE -->
-            <div class="colis-section">
-                <h3 class="section-title">📦 Colis en attente (<span id="countEnAttente">0</span>)</h3>
+                <div class="actions-bar">
+                    <button class="btn btn-primary" onclick="showAddClientModal()">+ Nouveau Client</button>
+                </div>
+
                 <div class="table-container">
-                    <table class="colisTable">
+                    <table id="clientsTable">
                         <thead>
                             <tr>
-                                <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('attente')"></th>
-                                <th>Date</th>
-                                <th>Produit</th>
-                                <th>Client / Adresse</th>
-                                <th>Statut</th>
-                                <th>Poids</th>
-                                <th>N° Suivi</th>
+                                <th>Nom</th>
+                                <th>Prénom</th>
+                                <th>Email</th>
+                                <th>Téléphone</th>
+                                <th>Ville</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="colisEnAttenteBody">
-                            <tr><td colspan="8" class="empty">Aucun colis en attente</td></tr>
+                        <tbody id="clientsTableBody">
+                            <tr><td colspan="6" class="empty">Aucun client</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- COLIS ENVOYÉS -->
-            <div class="colis-section">
-                <h3 class="section-title collapsible" onclick="toggleSection('expedies')">
-                    📫 Colis envoyés (<span id="countExpedies">0</span>)
-                    <span class="toggle-icon" id="toggleExpedies">▼</span>
-                </h3>
-                <div class="table-container" id="sectionExpedies">
-                    <table class="colisTable">
+            <!-- TAB PRODUITS -->
+            <div id="tab-produits" class="tab-content">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Produits</h1>
+                        <p class="page-subtitle">Catalogue de produits</p>
+                    </div>
+                </div>
+
+                <div class="actions-bar">
+                    <button class="btn btn-primary" onclick="showAddProduitModal()">+ Nouveau Produit</button>
+                </div>
+
+                <div class="table-container">
+                    <table id="produitsTable">
                         <thead>
                             <tr>
-                                <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('expedies')"></th>
-                                <th>Date</th>
-                                <th>Produit</th>
-                                <th>Client / Adresse</th>
-                                <th>Statut</th>
+                                <th>Nom</th>
+                                <th>Description</th>
+                                <th>Prix</th>
                                 <th>Poids</th>
-                                <th>N° Suivi</th>
+                                <th>Stock</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="colisExpediesBody">
-                            <tr><td colspan="8" class="empty">Aucun colis envoyé</td></tr>
+                        <tbody id="produitsTableBody">
+                            <tr><td colspan="6" class="empty">Aucun produit</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-        </div>
-
-        <!-- TAB CLIENTS -->
-        <div id="tab-clients" class="tab-content">
-            <div class="actions-bar">
-                <button class="btn btn-primary" onclick="showAddClientModal()">+ Nouveau Client</button>
-            </div>
-
-            <div class="table-container">
-                <table id="clientsTable">
-                    <thead>
-                        <tr>
-                            <th>Nom</th>
-                            <th>Prénom</th>
-                            <th>Email</th>
-                            <th>Téléphone</th>
-                            <th>Ville</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="clientsTableBody">
-                        <tr><td colspan="6" class="empty">Aucun client</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- TAB PRODUITS -->
-        <div id="tab-produits" class="tab-content">
-            <div class="actions-bar">
-                <button class="btn btn-primary" onclick="showAddProduitModal()">+ Nouveau Produit</button>
-            </div>
-
-            <div class="table-container">
-                <table id="produitsTable">
-                    <thead>
-                        <tr>
-                            <th>Nom</th>
-                            <th>Description</th>
-                            <th>Prix</th>
-                            <th>Poids</th>
-                            <th>Stock</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="produitsTableBody">
-                        <tr><td colspan="6" class="empty">Aucun produit</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        </main>
     </div>
 
     <!-- MODAL AJOUT CLIENT -->
@@ -290,16 +332,13 @@
                 </div>
 
                 <h3>Wallets</h3>
-                <div id="walletsContainer">
-                    <!-- Les champs wallets seront ajoutés dynamiquement -->
-                </div>
+                <div id="walletsContainer"></div>
                 <button type="button" class="btn btn-secondary btn-small" onclick="addWalletField()">+ Ajouter un wallet</button>
 
-                <h3 style="margin-top: 20px;">Liens externes</h3>
-                <div id="liensContainer">
-                    <!-- Les champs liens seront ajoutés dynamiquement -->
-                </div>
+                <h3>Liens externes</h3>
+                <div id="liensContainer"></div>
                 <button type="button" class="btn btn-secondary btn-small" onclick="addLienField()">+ Ajouter un lien</button>
+
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modalClient')">Annuler</button>
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
@@ -313,9 +352,7 @@
         <div class="modal-content">
             <span class="close" onclick="closeModal('modalClientDetails')">&times;</span>
             <h2>Détails du Client</h2>
-            <div id="clientDetailsContent">
-                <!-- Le contenu sera chargé dynamiquement -->
-            </div>
+            <div id="clientDetailsContent"></div>
             <div class="form-actions">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('modalClientDetails')">Fermer</button>
                 <button type="button" class="btn btn-primary" onclick="editClientFromDetails()">✏️ Éditer</button>
