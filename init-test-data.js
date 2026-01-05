@@ -89,6 +89,7 @@ function insertColis() {
         statut: 'En préparation',
         poids: 0.5,
         dimensions: '15x10x5cm',
+        reference: 'REF-2026-001',
         notes: 'Client VIP\nItem: iPhone 15 Pro\nLien: https://www.apple.com/fr/iphone-15-pro/\nPrix: 1199€\nN° Colis/mois: COL-01-2026'
       },
       {
@@ -97,6 +98,7 @@ function insertColis() {
         statut: 'Prêt à expédier',
         poids: 0.1,
         dimensions: '10x8x4cm',
+        reference: 'REF-2026-002',
         notes: 'Emballage cadeau\nItem: AirPods Pro 2\nLien: https://www.apple.com/fr/airpods-pro/\nPrix: 279€\nN° Colis/mois: COL-02-2026'
       },
       {
@@ -105,6 +107,7 @@ function insertColis() {
         statut: 'Expédié',
         poids: 0.45,
         dimensions: '16x11x6cm',
+        reference: 'REF-2026-003',
         notes: 'Livraison express\nItem: Samsung Galaxy S24\nLien: https://www.samsung.com/\nPrix: 899€\nN° Colis/mois: COL-03-2026',
         date_expedition: new Date().toISOString()
       },
@@ -114,6 +117,7 @@ function insertColis() {
         statut: 'En transit',
         poids: 2.1,
         dimensions: '45x30x10cm',
+        reference: 'REF-2026-004',
         notes: 'Fragile - Ordinateur portable\nItem: MacBook Pro 16"\nLien: https://www.apple.com/fr/macbook-pro/\nPrix: 2499€\nN° Colis/mois: COL-04-2026',
         date_expedition: new Date(Date.now() - 86400000).toISOString()
       },
@@ -123,6 +127,7 @@ function insertColis() {
         statut: 'Livré',
         poids: 0.6,
         dimensions: '30x25x3cm',
+        reference: 'REF-2026-005',
         notes: 'Signé par le destinataire\nItem: iPad Air\nLien: https://www.apple.com/fr/ipad-air/\nPrix: 699€\nN° Colis/mois: COL-05-2026',
         date_expedition: new Date(Date.now() - 172800000).toISOString(),
         date_livraison: new Date(Date.now() - 86400000).toISOString()
@@ -133,6 +138,7 @@ function insertColis() {
         statut: 'Livré',
         poids: 0.15,
         dimensions: '12x10x5cm',
+        reference: 'REF-2026-006',
         notes: 'Client satisfait\nItem: Apple Watch Series 9\nLien: https://www.apple.com/fr/apple-watch-series-9/\nPrix: 449€\nN° Colis/mois: COL-06-2026',
         date_expedition: new Date(Date.now() - 259200000).toISOString(),
         date_livraison: new Date(Date.now() - 172800000).toISOString()
@@ -141,10 +147,10 @@ function insertColis() {
 
     const stmt = db.prepare(`
       INSERT INTO colis (
-        numero_suivi, client_id, statut, poids, dimensions,
+        numero_suivi, client_id, statut, poids, dimensions, reference,
         adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
         notes, date_creation, date_expedition, date_livraison
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     let count = 0;
@@ -157,6 +163,7 @@ function insertColis() {
           colis.statut,
           colis.poids,
           colis.dimensions,
+          colis.reference,
           client.adresse,
           client.ville,
           client.code_postal,
