@@ -47,7 +47,6 @@ async function loadStats() {
 
         // Update sidebar stats
         document.getElementById('statClientsSidebar').textContent = stats.clients || 0;
-        document.getElementById('statColisSidebar').textContent = stats.colis || 0;
         document.getElementById('statPrepSidebar').textContent = stats.colisEnPreparation || 0;
     } catch (error) {
         console.error('Erreur chargement stats:', error);
