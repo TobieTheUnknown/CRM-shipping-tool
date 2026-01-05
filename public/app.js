@@ -482,3 +482,115 @@ window.onclick = function(event) {
         event.target.classList.remove('active');
     }
 }
+
+// ============= PLANNING & CSV IMPORT =============
+
+// Afficher le nom du fichier sélectionné
+document.addEventListener('DOMContentLoaded', () => {
+    const fileInput = document.getElementById('csvFile');
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            const fileName = e.target.files[0]?.name || 'Choisir un fichier CSV...';
+            document.getElementById('fileNameDisplay').textContent = fileName;
+        });
+    }
+});
+
+// Upload et import du CSV
+async function uploadCSV(event) {
+    event.preventDefault();
+
+    const fileInput = document.getElementById('csvFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert('Veuillez sélectionner un fichier CSV');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('csvFile', file);
+
+    const uploadBtn = document.getElementById('uploadBtn');
+    const originalText = uploadBtn.innerHTML;
+    uploadBtn.innerHTML = '<span class="loading"></span> Import en cours...';
+    uploadBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_URL}/api/import/csv`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        // Afficher le résultat
+        const resultDiv = document.getElementById('importResult');
+        const contentDiv = document.getElementById('importResultContent');
+
+        if (response.ok) {
+            contentDiv.innerHTML = `
+                <p class="import-success">✅ Import réussi!</p>
+                <p>Total de lignes: <strong>${result.total}</strong></p>
+                <p>Colis créés avec succès: <strong>${result.success}</strong></p>
+                ${result.errors > 0 ? `<p class="import-error">Erreurs: <strong>${result.errors}</strong></p>` : ''}
+                ${result.errorDetails && result.errorDetails.length > 0 ? `
+                    <details style="margin-top: 10px;">
+                        <summary style="cursor: pointer;">Voir les erreurs</summary>
+                        <ul style="margin-top: 10px;">
+                            ${result.errorDetails.map(err => `<li>Ligne ${err.row}: ${err.error}</li>`).join('')}
+                        </ul>
+                    </details>
+                ` : ''}
+            `;
+            resultDiv.style.display = 'block';
+
+            // Rafraîchir les données
+            loadStats();
+            loadClients();
+            loadColis();
+
+            // Réinitialiser le formulaire
+            document.getElementById('csvUploadForm').reset();
+            document.getElementById('fileNameDisplay').textContent = 'Choisir un fichier CSV...';
+        } else {
+            contentDiv.innerHTML = `
+                <p class="import-error">❌ Erreur lors de l'import</p>
+                <p>${result.error || 'Une erreur est survenue'}</p>
+            `;
+            resultDiv.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Erreur upload CSV:', error);
+        const resultDiv = document.getElementById('importResult');
+        const contentDiv = document.getElementById('importResultContent');
+        contentDiv.innerHTML = `
+            <p class="import-error">❌ Erreur réseau</p>
+            <p>${error.message}</p>
+        `;
+        resultDiv.style.display = 'block';
+    } finally {
+        uploadBtn.innerHTML = originalText;
+        uploadBtn.disabled = false;
+    }
+}
+
+// Télécharger un modèle CSV
+function downloadExampleCSV() {
+    const csvContent = `Item,Lien,Prix Objet (€),Poids (kg),Adresse d'envoi,Lien de suivi colis,Photos/Vidéos associées,Statut,Timestamp,N° Colis/mois,Note
+Smartphone XYZ,https://example.com/product/123,299.99,0.5,"123 Rue de la Paix, 75001 Paris, France",COL2024010001,https://photos.example.com/1,En préparation,2024-01-05T10:00:00,COL-01-2024,Fragile - Manipuler avec soin
+Ordinateur Portable ABC,https://example.com/product/456,899.00,2.3,"456 Avenue des Champs, 69001 Lyon, France",COL2024010002,https://photos.example.com/2,Expédié,2024-01-04T15:30:00,COL-02-2024,Garantie 2 ans incluse
+Casque Audio,https://example.com/product/789,149.50,0.3,"789 Boulevard Victor Hugo, 33000 Bordeaux, France",,https://photos.example.com/3,Livré,2024-01-03T09:15:00,COL-03-2024,Client VIP`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'modele_import_colis.csv');
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}

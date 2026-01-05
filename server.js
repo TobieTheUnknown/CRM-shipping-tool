@@ -4,14 +4,174 @@ const cors = require('cors');
 const path = require('path');
 const db = require('./database');
 const PDFDocument = require('pdfkit');
+const multer = require('multer');
+const csv = require('csv-parser');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configuration Multer pour l'upload de fichiers
+const upload = multer({ dest: 'uploads/' });
+
+// Créer le dossier uploads s'il n'existe pas
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static('public'));
+
+// ============= IMPORT CSV =============
+
+// Fonction pour parser l'adresse
+function parseAdresse(adresseComplete) {
+  // Essayer de parser une adresse du type: "123 Rue de la Paix, 75001 Paris, France"
+  const parts = adresseComplete.split(',').map(p => p.trim());
+
+  let adresse = '';
+  let ville = '';
+  let code_postal = '';
+  let pays = 'France';
+
+  if (parts.length >= 1) {
+    adresse = parts[0];
+  }
+
+  if (parts.length >= 2) {
+    // Extraire code postal et ville depuis "75001 Paris"
+    const villeMatch = parts[1].match(/(\d{5})\s+(.+)/);
+    if (villeMatch) {
+      code_postal = villeMatch[1];
+      ville = villeMatch[2];
+    } else {
+      ville = parts[1];
+    }
+  }
+
+  if (parts.length >= 3) {
+    pays = parts[2];
+  }
+
+  return { adresse, ville, code_postal, pays };
+}
+
+// Route pour importer un CSV
+app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Aucun fichier uploadé' });
+  }
+
+  const results = [];
+  const errors = [];
+  let processedCount = 0;
+  let successCount = 0;
+
+  fs.createReadStream(req.file.path)
+    .pipe(csv())
+    .on('data', (data) => results.push(data))
+    .on('end', () => {
+      // Supprimer le fichier temporaire
+      fs.unlinkSync(req.file.path);
+
+      if (results.length === 0) {
+        return res.status(400).json({ error: 'Le fichier CSV est vide' });
+      }
+
+      // Traiter chaque ligne du CSV
+      results.forEach((row, index) => {
+        // Parser l'adresse
+        const adresseData = parseAdresse(row["Adresse d'envoi"] || '');
+
+        // Extraire le nom du client depuis l'adresse ou créer un client par défaut
+        const nomClient = `Client CSV ${index + 1}`;
+
+        // D'abord créer ou récupérer le client
+        db.run(
+          `INSERT INTO clients (nom, prenom, adresse, ville, code_postal, pays)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [nomClient, '', adresseData.adresse, adresseData.ville, adresseData.code_postal, adresseData.pays],
+          function(err) {
+            if (err) {
+              errors.push({ row: index + 1, error: err.message });
+              processedCount++;
+              checkIfComplete();
+              return;
+            }
+
+            const clientId = this.lastID;
+
+            // Extraire les données du CSV
+            const item = row['Item'] || '';
+            const lien = row['Lien'] || '';
+            const prix = parseFloat(row['Prix Objet (€)'] || row['Prix Objet'] || 0);
+            const poids = parseFloat(row['Poids (kg)'] || row['Poids'] || 0);
+            const lienSuivi = row['Lien de suivi colis'] || '';
+            const photos = row['Photos/Vidéos associées'] || '';
+            const statut = row['Statut'] || 'En préparation';
+            const timestamp = row['Timestamp'] || null;
+            const numeroColisMois = row['N° Colis/mois'] || '';
+            const note = row['Note'] || '';
+
+            // Construire les notes avec toutes les infos supplémentaires
+            let notesComplete = note;
+            if (item) notesComplete += `\nItem: ${item}`;
+            if (lien) notesComplete += `\nLien: ${lien}`;
+            if (prix) notesComplete += `\nPrix: ${prix}€`;
+            if (photos) notesComplete += `\nPhotos/Vidéos: ${photos}`;
+            if (numeroColisMois) notesComplete += `\nN° Colis/mois: ${numeroColisMois}`;
+
+            // Créer le colis
+            db.run(
+              `INSERT INTO colis (numero_suivi, client_id, statut, poids,
+                                  adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
+                                  notes, date_creation)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                lienSuivi || `COL${Date.now()}-${index}`,
+                clientId,
+                statut,
+                poids || null,
+                adresseData.adresse,
+                adresseData.ville,
+                adresseData.code_postal,
+                adresseData.pays,
+                notesComplete.trim(),
+                timestamp || new Date().toISOString()
+              ],
+              function(err) {
+                if (err) {
+                  errors.push({ row: index + 1, error: err.message });
+                } else {
+                  successCount++;
+                }
+                processedCount++;
+                checkIfComplete();
+              }
+            );
+          }
+        );
+      });
+
+      function checkIfComplete() {
+        if (processedCount === results.length) {
+          res.json({
+            message: 'Import terminé',
+            total: results.length,
+            success: successCount,
+            errors: errors.length,
+            errorDetails: errors
+          });
+        }
+      }
+    })
+    .on('error', (error) => {
+      fs.unlinkSync(req.file.path);
+      res.status(500).json({ error: 'Erreur lors de la lecture du CSV: ' + error.message });
+    });
+});
 
 // ============= ROUTES CLIENTS =============
 
