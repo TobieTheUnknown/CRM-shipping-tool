@@ -415,18 +415,18 @@ app.post('/api/colis', (req, res) => {
 // Mettre à jour un colis
 app.put('/api/colis/:id', (req, res) => {
   const {
-    numero_suivi, statut, poids, dimensions, reference,
+    client_id, numero_suivi, statut, poids, dimensions, reference,
     adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
     date_expedition, date_livraison, notes
   } = req.body;
 
   db.run(
     `UPDATE colis
-     SET numero_suivi=?, statut=?, poids=?, dimensions=?, reference=?,
+     SET client_id=?, numero_suivi=?, statut=?, poids=?, dimensions=?, reference=?,
          adresse_expedition=?, adresse_ligne2=?, ville_expedition=?, code_postal_expedition=?, pays_expedition=?,
          date_expedition=?, date_livraison=?, notes=?
      WHERE id=?`,
-    [numero_suivi, statut, poids, dimensions, reference,
+    [client_id, numero_suivi, statut, poids, dimensions, reference,
      adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
      date_expedition, date_livraison, notes, req.params.id],
     function(err) {
