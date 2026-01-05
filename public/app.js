@@ -112,6 +112,8 @@ function editClient(id) {
     document.getElementById('clientVille').value = client.ville || '';
     document.getElementById('clientCodePostal').value = client.code_postal || '';
     document.getElementById('clientPays').value = client.pays || 'France';
+    document.getElementById('clientWallet').value = client.wallet || '';
+    document.getElementById('clientLien').value = client.lien || '';
 
     document.getElementById('modalClient').classList.add('active');
 }
@@ -128,7 +130,9 @@ async function saveClient(event) {
         adresse: document.getElementById('clientAdresse').value,
         ville: document.getElementById('clientVille').value,
         code_postal: document.getElementById('clientCodePostal').value,
-        pays: document.getElementById('clientPays').value
+        pays: document.getElementById('clientPays').value,
+        wallet: document.getElementById('clientWallet').value,
+        lien: document.getElementById('clientLien').value
     };
 
     try {
@@ -165,6 +169,70 @@ async function deleteClient(id) {
         }
     } catch (error) {
         console.error('Erreur suppression client:', error);
+    }
+}
+
+async function viewClientDetails(clientId) {
+    try {
+        const response = await fetch(`${API_URL}/api/clients/${clientId}`);
+        const client = await response.json();
+
+        if (!client) {
+            alert('Client introuvable');
+            return;
+        }
+
+        const detailsHtml = `
+            <div style="display: grid; gap: 15px;">
+                <div>
+                    <strong>Nom complet:</strong><br>
+                    ${client.nom} ${client.prenom || ''}
+                </div>
+                <div>
+                    <strong>Email:</strong><br>
+                    ${client.email ? `<a href="mailto:${client.email}">${client.email}</a>` : '-'}
+                </div>
+                <div>
+                    <strong>Téléphone:</strong><br>
+                    ${client.telephone ? `<a href="tel:${client.telephone}">${client.telephone}</a>` : '-'}
+                </div>
+                <div>
+                    <strong>Adresse:</strong><br>
+                    ${client.adresse || '-'}<br>
+                    ${client.code_postal || ''} ${client.ville || ''}<br>
+                    ${client.pays || 'France'}
+                </div>
+                ${client.wallet ? `
+                <div>
+                    <strong>Wallet:</strong><br>
+                    <code style="background: #f0f0f0; padding: 5px; border-radius: 3px; display: inline-block; word-break: break-all;">${client.wallet}</code>
+                </div>
+                ` : ''}
+                ${client.lien ? `
+                <div>
+                    <strong>Profil externe:</strong><br>
+                    <a href="${client.lien}" target="_blank" class="product-link">${client.lien}</a>
+                </div>
+                ` : ''}
+            </div>
+        `;
+
+        document.getElementById('clientDetailsContent').innerHTML = detailsHtml;
+
+        // Store the client ID for editing
+        window.currentClientDetailsId = clientId;
+
+        document.getElementById('modalClientDetails').classList.add('active');
+    } catch (error) {
+        console.error('Erreur chargement détails client:', error);
+        alert('Erreur lors du chargement des détails');
+    }
+}
+
+function editClientFromDetails() {
+    if (window.currentClientDetailsId) {
+        closeModal('modalClientDetails');
+        editClient(window.currentClientDetailsId);
     }
 }
 
@@ -353,7 +421,7 @@ function renderColisRow(c, section) {
     const adresse = c.ville_expedition || c.adresse_expedition || '';
     const pays = c.pays_expedition || 'France';
     const clientHtml = `
-        <span class="client-name">${clientNom}</span>
+        <span class="client-name" style="cursor: pointer; color: #667eea;" onclick="viewClientDetails(${c.client_id})">${clientNom}</span>
         <span class="client-address">${adresse}${pays !== 'France' ? ` - ${pays}` : ''}</span>
     `;
 
@@ -403,6 +471,10 @@ function fillClientAddress() {
     }
 }
 
+function setDimension(dimension) {
+    document.getElementById('colisDimensions').value = dimension + 'cm';
+}
+
 function editColis(id) {
     const c = colis.find(col => col.id === id);
     if (!c) return;
@@ -413,6 +485,7 @@ function editColis(id) {
     document.getElementById('colisStatut').value = c.statut;
     document.getElementById('colisPoids').value = c.poids || '';
     document.getElementById('colisDimensions').value = c.dimensions || '';
+    document.getElementById('colisReference').value = c.reference || '';
     document.getElementById('colisAdresse').value = c.adresse_expedition || '';
     document.getElementById('colisVille').value = c.ville_expedition || '';
     document.getElementById('colisCodePostal').value = c.code_postal_expedition || '';
@@ -432,6 +505,7 @@ async function saveColis(event) {
         statut: document.getElementById('colisStatut').value,
         poids: parseFloat(document.getElementById('colisPoids').value) || null,
         dimensions: document.getElementById('colisDimensions').value,
+        reference: document.getElementById('colisReference').value,
         adresse_expedition: document.getElementById('colisAdresse').value,
         ville_expedition: document.getElementById('colisVille').value,
         code_postal_expedition: document.getElementById('colisCodePostal').value,
@@ -524,10 +598,16 @@ async function imprimerEtiquettesSelection() {
     }
 
     try {
+        // Récupérer le logo depuis localStorage
+        const logoData = localStorage.getItem('shippingLogo');
+
         const response = await fetch(`${API_URL}/api/etiquettes/pdf`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ colisIds: Array.from(selectedColis) })
+            body: JSON.stringify({
+                colisIds: Array.from(selectedColis),
+                logoData: logoData
+            })
         });
 
         if (response.ok) {
@@ -541,7 +621,7 @@ async function imprimerEtiquettesSelection() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
-            alert(`${selectedColis.size} étiquette(s) générée(s) avec succès!`);
+            alert(`${selectedColis.size} étiquette(s) générée(s) avec succès!\n\nFormat: 6 étiquettes par page (2x3)`);
         } else {
             alert('Erreur lors de la génération du PDF');
         }
@@ -781,4 +861,71 @@ async function resetDatabase() {
         console.error('Erreur reset base de données:', error);
         alert('Erreur lors de la réinitialisation');
     }
+}
+
+// ============= LOGO MANAGEMENT =============
+
+// Charger le logo au démarrage
+document.addEventListener('DOMContentLoaded', () => {
+    loadLogo();
+});
+
+function loadLogo() {
+    const logoData = localStorage.getItem('shippingLogo');
+    if (logoData) {
+        document.getElementById('logoImage').src = logoData;
+        document.getElementById('logoImage').style.display = 'block';
+        document.getElementById('logoPlaceholder').style.display = 'none';
+        document.getElementById('btnRemoveLogo').style.display = 'inline-block';
+    }
+}
+
+function uploadLogo() {
+    const fileInput = document.getElementById('logoFileInput');
+    const file = fileInput.files[0];
+
+    if (!file) return;
+
+    // Vérifier le type de fichier
+    if (!file.type.match('image/(png|jpeg|jpg)')) {
+        alert('Format de fichier non supporté. Utilisez PNG, JPG ou JPEG.');
+        return;
+    }
+
+    // Vérifier la taille (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+        alert('Le fichier est trop volumineux. Taille maximum: 2MB');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const logoData = e.target.result;
+
+        // Sauvegarder dans localStorage
+        localStorage.setItem('shippingLogo', logoData);
+
+        // Afficher le logo
+        document.getElementById('logoImage').src = logoData;
+        document.getElementById('logoImage').style.display = 'block';
+        document.getElementById('logoPlaceholder').style.display = 'none';
+        document.getElementById('btnRemoveLogo').style.display = 'inline-block';
+
+        alert('Logo uploadé avec succès!');
+    };
+
+    reader.readAsDataURL(file);
+}
+
+function removeLogo() {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer le logo?')) return;
+
+    localStorage.removeItem('shippingLogo');
+    document.getElementById('logoImage').src = '';
+    document.getElementById('logoImage').style.display = 'none';
+    document.getElementById('logoPlaceholder').style.display = 'block';
+    document.getElementById('btnRemoveLogo').style.display = 'none';
+    document.getElementById('logoFileInput').value = '';
+
+    alert('Logo supprimé');
 }

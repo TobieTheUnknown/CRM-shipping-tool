@@ -52,9 +52,30 @@ function initDatabase() {
     date_expedition DATETIME,
     date_livraison DATETIME,
     notes TEXT,
+    reference TEXT,
     FOREIGN KEY (client_id) REFERENCES clients (id)
   )`);
 
+  // Ajouter la colonne reference si elle n'existe pas (pour migration)
+  db.run(`ALTER TABLE colis ADD COLUMN reference TEXT`, (err) => {
+    // Ignore l'erreur si la colonne existe déjà
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Erreur ajout colonne reference:', err.message);
+    }
+  });
+
+  // Ajouter les colonnes wallet et lien aux clients (pour migration)
+  db.run(`ALTER TABLE clients ADD COLUMN wallet TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Erreur ajout colonne wallet:', err.message);
+    }
+  });
+
+  db.run(`ALTER TABLE clients ADD COLUMN lien TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Erreur ajout colonne lien:', err.message);
+    }
+  });
   // Table Produits dans Colis (relation many-to-many)
   db.run(`CREATE TABLE IF NOT EXISTS colis_produits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

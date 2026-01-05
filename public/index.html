@@ -92,6 +92,29 @@
                 </button>
             </div>
 
+            <!-- CONFIGURATION LOGO -->
+            <div class="database-tools">
+                <h3>🖼️ Configuration Logo pour Étiquettes</h3>
+                <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                    Logo affiché sur les étiquettes d'expédition (format horizontal recommandé)
+                </p>
+                <div class="logo-upload-section">
+                    <div id="logoPreview" class="logo-preview">
+                        <img id="logoImage" src="" alt="Logo" style="display: none; max-width: 100%; max-height: 80px;">
+                        <p id="logoPlaceholder">Aucun logo configuré</p>
+                    </div>
+                    <div class="logo-actions">
+                        <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/jpg" style="display: none;" onchange="uploadLogo()">
+                        <button class="btn btn-primary" onclick="document.getElementById('logoFileInput').click()">
+                            📤 Choisir un logo
+                        </button>
+                        <button class="btn btn-danger" onclick="removeLogo()" id="btnRemoveLogo" style="display: none;">
+                            🗑️ Supprimer le logo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- OUTILS BASE DE DONNÉES -->
             <div class="database-tools">
                 <h3>🛠️ Outils de base de données</h3>
@@ -265,11 +288,34 @@
                     <label>Pays</label>
                     <input type="text" id="clientPays" value="France">
                 </div>
+                <div class="form-group">
+                    <label>Wallet</label>
+                    <input type="text" id="clientWallet" placeholder="Adresse wallet">
+                </div>
+                <div class="form-group">
+                    <label>Lien profil externe</label>
+                    <input type="url" id="clientLien" placeholder="https://...">
+                </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modalClient')">Annuler</button>
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL DÉTAILS CLIENT -->
+    <div id="modalClientDetails" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('modalClientDetails')">&times;</span>
+            <h2>Détails du Client</h2>
+            <div id="clientDetailsContent">
+                <!-- Le contenu sera chargé dynamiquement -->
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modalClientDetails')">Fermer</button>
+                <button type="button" class="btn btn-primary" onclick="editClientFromDetails()">✏️ Éditer</button>
+            </div>
         </div>
     </div>
 
@@ -347,8 +393,20 @@
                         <input type="number" step="0.01" id="colisPoids">
                     </div>
                     <div class="form-group">
-                        <label>Dimensions</label>
-                        <input type="text" id="colisDimensions" placeholder="Ex: 30x20x15cm">
+                        <label>Référence (pour étiquette)</label>
+                        <input type="text" id="colisReference" placeholder="Ex: REF2024-001">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Dimensions</label>
+                    <input type="text" id="colisDimensions" placeholder="Ex: 30x20x15cm">
+                    <div class="dimension-buttons">
+                        <button type="button" class="btn-dimension" onclick="setDimension('20x15x10')">20x15x10</button>
+                        <button type="button" class="btn-dimension" onclick="setDimension('30x20x15')">30x20x15</button>
+                        <button type="button" class="btn-dimension" onclick="setDimension('40x30x20')">40x30x20</button>
+                        <button type="button" class="btn-dimension" onclick="setDimension('50x40x30')">50x40x30</button>
+                        <button type="button" class="btn-dimension" onclick="setDimension('60x40x40')">60x40x40</button>
                     </div>
                 </div>
 
