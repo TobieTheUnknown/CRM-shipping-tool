@@ -512,16 +512,6 @@ app.post('/api/etiquettes/pdf', (req, res) => {
       const startX = col * labelWidth;
       const startY = row * labelHeight;
 
-      // Bordure simple en pointillés discrets
-      doc.strokeColor('#cccccc')
-         .lineWidth(0.5)
-         .dash(4, 4)
-         .rect(startX + 3, startY + 3, labelWidth - 6, labelHeight - 6)
-         .stroke()
-         .undash()
-         .strokeColor('#000000')
-         .lineWidth(1);
-
       let currentY = startY + margin + 8;
 
       // Logo (si disponible)
@@ -577,23 +567,26 @@ app.post('/api/etiquettes/pdf', (req, res) => {
       // ===== DESTINATAIRE =====
       doc.fontSize(9)
          .font('Helvetica-Bold')
+         .fillColor('#2563eb')
          .text('DESTINATAIRE', startX + margin, currentY, {
            width: labelWidth - 2 * margin
          });
 
-      // Soulignement du titre
+      // Soulignement du titre en bleu
       const destTitleWidth = doc.widthOfString('DESTINATAIRE');
-      doc.strokeColor('#000000')
+      doc.strokeColor('#2563eb')
          .lineWidth(1.5)
          .moveTo(startX + margin, currentY + 11)
          .lineTo(startX + margin + destTitleWidth, currentY + 11)
          .stroke()
-         .lineWidth(1);
+         .lineWidth(1)
+         .strokeColor('#000000');
       currentY += 18;
 
       // Nom + Prénom (en gros et gras)
       doc.fontSize(12)
          .font('Helvetica-Bold')
+         .fillColor('#000000')
          .text(
            `${colis.client_nom || ''} ${colis.client_prenom || ''}`.trim().toUpperCase(),
            startX + margin,
@@ -635,18 +628,21 @@ app.post('/api/etiquettes/pdf', (req, res) => {
          );
       currentY += 14;
 
-      // Pays (souligné si différent de France)
+      // Pays (en couleur si différent de France)
       const pays = colis.pays_expedition || colis.client_pays || 'France';
       if (pays.toLowerCase() !== 'france') {
         doc.fontSize(10)
            .font('Helvetica-Bold')
+           .fillColor('#dc2626')
            .text(pays, startX + margin, currentY, {
              width: labelWidth - 2 * margin,
              underline: true
-           });
+           })
+           .fillColor('#000000');
       } else {
         doc.fontSize(9)
            .font('Helvetica')
+           .fillColor('#000000')
            .text(pays, startX + margin, currentY, { width: labelWidth - 2 * margin });
       }
       currentY += 18;
@@ -693,15 +689,16 @@ app.post('/api/etiquettes/pdf', (req, res) => {
 
       currentY += 30;
 
-      // Référence (soulignée)
+      // Référence (soulignée en vert)
       if (colis.reference) {
         doc.fontSize(10)
-           .fillColor('#000000')
+           .fillColor('#059669')
            .font('Helvetica-Bold')
            .text(`Ref: ${colis.reference}`, startX + margin, currentY, {
              width: labelWidth - 2 * margin,
              underline: true
-           });
+           })
+           .fillColor('#000000');
       }
     });
 
