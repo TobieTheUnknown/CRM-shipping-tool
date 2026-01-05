@@ -31,13 +31,112 @@
         </header>
 
         <nav class="tabs">
-            <button class="tab-btn active" data-tab="colis">Colis</button>
+            <button class="tab-btn active" data-tab="planning">Planning</button>
+            <button class="tab-btn" data-tab="colis">Colis</button>
             <button class="tab-btn" data-tab="clients">Clients</button>
             <button class="tab-btn" data-tab="produits">Produits</button>
         </nav>
 
+        <!-- TAB PLANNING -->
+        <div id="tab-planning" class="tab-content active">
+            <div class="planning-header">
+                <h2>📋 Import CSV Planning</h2>
+                <p>Importez vos colis en masse via un fichier CSV</p>
+            </div>
+
+            <div class="csv-upload-section">
+                <div class="upload-card">
+                    <div class="upload-icon">📄</div>
+                    <h3>Format CSV attendu</h3>
+                    <p>Colonnes requises :</p>
+                    <ul class="csv-columns">
+                        <li><strong>Item</strong> - Nom de l'article</li>
+                        <li><strong>Lien</strong> - Lien vers l'article</li>
+                        <li><strong>Prix Objet (€)</strong> - Prix en euros</li>
+                        <li><strong>Poids (kg)</strong> - Poids du colis</li>
+                        <li><strong>Adresse d'envoi</strong> - Adresse complète</li>
+                        <li><strong>Lien de suivi colis</strong> - Numéro de suivi</li>
+                        <li><strong>Photos/Vidéos associées</strong> - Liens médias</li>
+                        <li><strong>Statut</strong> - État du colis</li>
+                        <li><strong>Timestamp</strong> - Date de création</li>
+                        <li><strong>N° Colis/mois</strong> - Référence</li>
+                        <li><strong>Note</strong> - Notes additionnelles</li>
+                    </ul>
+                </div>
+
+                <div class="upload-card">
+                    <h3>📤 Importer votre fichier</h3>
+                    <form id="csvUploadForm" onsubmit="uploadCSV(event)">
+                        <div class="file-input-wrapper">
+                            <input type="file" id="csvFile" accept=".csv" required>
+                            <label for="csvFile" class="file-label">
+                                <span id="fileNameDisplay">Choisir un fichier CSV...</span>
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-large" id="uploadBtn">
+                            ⬆️ Importer le CSV
+                        </button>
+                    </form>
+
+                    <div id="importResult" class="import-result" style="display: none;">
+                        <h4>Résultat de l'import</h4>
+                        <div id="importResultContent"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="csv-example">
+                <h3>📝 Exemple de fichier CSV</h3>
+                <button class="btn btn-secondary" onclick="downloadExampleCSV()">
+                    💾 Télécharger un modèle CSV
+                </button>
+            </div>
+
+            <!-- CONFIGURATION LOGO -->
+            <div class="database-tools">
+                <h3>🖼️ Configuration Logo pour Étiquettes</h3>
+                <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                    Logo affiché sur les étiquettes d'expédition (format horizontal recommandé)
+                </p>
+                <div class="logo-upload-section">
+                    <div id="logoPreview" class="logo-preview">
+                        <img id="logoImage" src="" alt="Logo" style="display: none; max-width: 100%; max-height: 80px;">
+                        <p id="logoPlaceholder">Aucun logo configuré</p>
+                    </div>
+                    <div class="logo-actions">
+                        <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/jpg" style="display: none;" onchange="uploadLogo()">
+                        <button class="btn btn-primary" onclick="document.getElementById('logoFileInput').click()">
+                            📤 Choisir un logo
+                        </button>
+                        <button class="btn btn-danger" onclick="removeLogo()" id="btnRemoveLogo" style="display: none;">
+                            🗑️ Supprimer le logo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OUTILS BASE DE DONNÉES -->
+            <div class="database-tools">
+                <h3>🛠️ Outils de base de données</h3>
+                <div class="tools-buttons">
+                    <button class="btn btn-success" onclick="initTestData()">
+                        🎲 Charger des données de test
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportDatabase()">
+                        💾 Exporter la base de données
+                    </button>
+                    <button class="btn btn-danger" onclick="resetDatabase()">
+                        🗑️ Réinitialiser la base de données
+                    </button>
+                </div>
+                <div id="dbToolsResult" class="import-result" style="display: none;">
+                    <div id="dbToolsResultContent"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- TAB COLIS -->
-        <div id="tab-colis" class="tab-content active">
+        <div id="tab-colis" class="tab-content">
             <div class="actions-bar">
                 <button class="btn btn-primary" onclick="showAddColisModal()">+ Nouveau Colis</button>
                 <button class="btn btn-success" onclick="imprimerEtiquettesSelection()" id="btnImprimerSelection" disabled>
@@ -45,24 +144,55 @@
                 </button>
             </div>
 
-            <div class="table-container">
-                <table id="colisTable">
-                    <thead>
-                        <tr>
-                            <th><input type="checkbox" id="selectAllColis" onchange="toggleSelectAll()"></th>
-                            <th>N° Suivi</th>
-                            <th>Client</th>
-                            <th>Statut</th>
-                            <th>Poids</th>
-                            <th>Destination</th>
-                            <th>Date création</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="colisTableBody">
-                        <tr><td colspan="8" class="empty">Aucun colis</td></tr>
-                    </tbody>
-                </table>
+            <!-- COLIS EN ATTENTE -->
+            <div class="colis-section">
+                <h3 class="section-title">📦 Colis en attente (<span id="countEnAttente">0</span>)</h3>
+                <div class="table-container">
+                    <table class="colisTable">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('attente')"></th>
+                                <th>Date</th>
+                                <th>Produit</th>
+                                <th>Client / Adresse</th>
+                                <th>Statut</th>
+                                <th>Poids</th>
+                                <th>N° Suivi</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="colisEnAttenteBody">
+                            <tr><td colspan="8" class="empty">Aucun colis en attente</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- COLIS ENVOYÉS -->
+            <div class="colis-section">
+                <h3 class="section-title collapsible" onclick="toggleSection('expedies')">
+                    📫 Colis envoyés (<span id="countExpedies">0</span>)
+                    <span class="toggle-icon" id="toggleExpedies">▼</span>
+                </h3>
+                <div class="table-container" id="sectionExpedies">
+                    <table class="colisTable">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('expedies')"></th>
+                                <th>Date</th>
+                                <th>Produit</th>
+                                <th>Client / Adresse</th>
+                                <th>Statut</th>
+                                <th>Poids</th>
+                                <th>N° Suivi</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="colisExpediesBody">
+                            <tr><td colspan="8" class="empty">Aucun colis envoyé</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -158,11 +288,38 @@
                     <label>Pays</label>
                     <input type="text" id="clientPays" value="France">
                 </div>
+
+                <h3>Wallets</h3>
+                <div id="walletsContainer">
+                    <!-- Les champs wallets seront ajoutés dynamiquement -->
+                </div>
+                <button type="button" class="btn btn-secondary btn-small" onclick="addWalletField()">+ Ajouter un wallet</button>
+
+                <h3 style="margin-top: 20px;">Liens externes</h3>
+                <div id="liensContainer">
+                    <!-- Les champs liens seront ajoutés dynamiquement -->
+                </div>
+                <button type="button" class="btn btn-secondary btn-small" onclick="addLienField()">+ Ajouter un lien</button>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modalClient')">Annuler</button>
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL DÉTAILS CLIENT -->
+    <div id="modalClientDetails" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('modalClientDetails')">&times;</span>
+            <h2>Détails du Client</h2>
+            <div id="clientDetailsContent">
+                <!-- Le contenu sera chargé dynamiquement -->
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modalClientDetails')">Fermer</button>
+                <button type="button" class="btn btn-primary" onclick="editClientFromDetails()">✏️ Éditer</button>
+            </div>
         </div>
     </div>
 
@@ -240,15 +397,31 @@
                         <input type="number" step="0.01" id="colisPoids">
                     </div>
                     <div class="form-group">
-                        <label>Dimensions</label>
-                        <input type="text" id="colisDimensions" placeholder="Ex: 30x20x15cm">
+                        <label>Référence (pour étiquette)</label>
+                        <input type="text" id="colisReference" placeholder="Ex: REF2024-001">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Dimensions</label>
+                    <input type="text" id="colisDimensions" placeholder="Ex: 30x20x15cm">
+                    <div class="dimension-buttons">
+                        <button type="button" class="btn-dimension" onclick="setDimension('20x15x10')">20x15x10</button>
+                        <button type="button" class="btn-dimension" onclick="setDimension('30x20x15')">30x20x15</button>
+                        <button type="button" class="btn-dimension" onclick="setDimension('40x30x20')">40x30x20</button>
+                        <button type="button" class="btn-dimension" onclick="setDimension('50x40x30')">50x40x30</button>
+                        <button type="button" class="btn-dimension" onclick="setDimension('60x40x40')">60x40x40</button>
                     </div>
                 </div>
 
                 <h3>Adresse d'expédition</h3>
                 <div class="form-group">
-                    <label>Adresse</label>
+                    <label>Adresse (ligne 1)</label>
                     <input type="text" id="colisAdresse">
+                </div>
+                <div class="form-group">
+                    <label>Adresse (ligne 2 - optionnel)</label>
+                    <input type="text" id="colisAdresseLigne2" placeholder="Bâtiment, étage, complément...">
                 </div>
                 <div class="form-row">
                     <div class="form-group">

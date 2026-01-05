@@ -4,14 +4,174 @@ const cors = require('cors');
 const path = require('path');
 const db = require('./database');
 const PDFDocument = require('pdfkit');
+const multer = require('multer');
+const csv = require('csv-parser');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configuration Multer pour l'upload de fichiers
+const upload = multer({ dest: 'uploads/' });
+
+// Créer le dossier uploads s'il n'existe pas
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static('public'));
+
+// ============= IMPORT CSV =============
+
+// Fonction pour parser l'adresse
+function parseAdresse(adresseComplete) {
+  // Essayer de parser une adresse du type: "123 Rue de la Paix, 75001 Paris, France"
+  const parts = adresseComplete.split(',').map(p => p.trim());
+
+  let adresse = '';
+  let ville = '';
+  let code_postal = '';
+  let pays = 'France';
+
+  if (parts.length >= 1) {
+    adresse = parts[0];
+  }
+
+  if (parts.length >= 2) {
+    // Extraire code postal et ville depuis "75001 Paris"
+    const villeMatch = parts[1].match(/(\d{5})\s+(.+)/);
+    if (villeMatch) {
+      code_postal = villeMatch[1];
+      ville = villeMatch[2];
+    } else {
+      ville = parts[1];
+    }
+  }
+
+  if (parts.length >= 3) {
+    pays = parts[2];
+  }
+
+  return { adresse, ville, code_postal, pays };
+}
+
+// Route pour importer un CSV
+app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Aucun fichier uploadé' });
+  }
+
+  const results = [];
+  const errors = [];
+  let processedCount = 0;
+  let successCount = 0;
+
+  fs.createReadStream(req.file.path)
+    .pipe(csv())
+    .on('data', (data) => results.push(data))
+    .on('end', () => {
+      // Supprimer le fichier temporaire
+      fs.unlinkSync(req.file.path);
+
+      if (results.length === 0) {
+        return res.status(400).json({ error: 'Le fichier CSV est vide' });
+      }
+
+      // Traiter chaque ligne du CSV
+      results.forEach((row, index) => {
+        // Parser l'adresse
+        const adresseData = parseAdresse(row["Adresse d'envoi"] || '');
+
+        // Extraire le nom du client depuis l'adresse ou créer un client par défaut
+        const nomClient = `Client CSV ${index + 1}`;
+
+        // D'abord créer ou récupérer le client
+        db.run(
+          `INSERT INTO clients (nom, prenom, adresse, ville, code_postal, pays)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [nomClient, '', adresseData.adresse, adresseData.ville, adresseData.code_postal, adresseData.pays],
+          function(err) {
+            if (err) {
+              errors.push({ row: index + 1, error: err.message });
+              processedCount++;
+              checkIfComplete();
+              return;
+            }
+
+            const clientId = this.lastID;
+
+            // Extraire les données du CSV
+            const item = row['Item'] || '';
+            const lien = row['Lien'] || '';
+            const prix = parseFloat(row['Prix Objet (€)'] || row['Prix Objet'] || 0);
+            const poids = parseFloat(row['Poids (kg)'] || row['Poids'] || 0);
+            const lienSuivi = row['Lien de suivi colis'] || '';
+            const photos = row['Photos/Vidéos associées'] || '';
+            const statut = row['Statut'] || 'En préparation';
+            const timestamp = row['Timestamp'] || null;
+            const numeroColisMois = row['N° Colis/mois'] || '';
+            const note = row['Note'] || '';
+
+            // Construire les notes avec toutes les infos supplémentaires
+            let notesComplete = note;
+            if (item) notesComplete += `\nItem: ${item}`;
+            if (lien) notesComplete += `\nLien: ${lien}`;
+            if (prix) notesComplete += `\nPrix: ${prix}€`;
+            if (photos) notesComplete += `\nPhotos/Vidéos: ${photos}`;
+            if (numeroColisMois) notesComplete += `\nN° Colis/mois: ${numeroColisMois}`;
+
+            // Créer le colis
+            db.run(
+              `INSERT INTO colis (numero_suivi, client_id, statut, poids,
+                                  adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
+                                  notes, date_creation)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                lienSuivi || `COL${Date.now()}-${index}`,
+                clientId,
+                statut,
+                poids || null,
+                adresseData.adresse,
+                adresseData.ville,
+                adresseData.code_postal,
+                adresseData.pays,
+                notesComplete.trim(),
+                timestamp || new Date().toISOString()
+              ],
+              function(err) {
+                if (err) {
+                  errors.push({ row: index + 1, error: err.message });
+                } else {
+                  successCount++;
+                }
+                processedCount++;
+                checkIfComplete();
+              }
+            );
+          }
+        );
+      });
+
+      function checkIfComplete() {
+        if (processedCount === results.length) {
+          res.json({
+            message: 'Import terminé',
+            total: results.length,
+            success: successCount,
+            errors: errors.length,
+            errorDetails: errors
+          });
+        }
+      }
+    })
+    .on('error', (error) => {
+      fs.unlinkSync(req.file.path);
+      res.status(500).json({ error: 'Erreur lors de la lecture du CSV: ' + error.message });
+    });
+});
 
 // ============= ROUTES CLIENTS =============
 
@@ -39,12 +199,12 @@ app.get('/api/clients/:id', (req, res) => {
 
 // Créer un nouveau client
 app.post('/api/clients', (req, res) => {
-  const { nom, prenom, email, telephone, adresse, ville, code_postal, pays } = req.body;
+  const { nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien } = req.body;
 
   db.run(
-    `INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, code_postal, pays)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [nom, prenom, email, telephone, adresse, ville, code_postal, pays || 'France'],
+    `INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [nom, prenom, email, telephone, adresse, ville, code_postal, pays || 'France', wallet, lien],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -57,13 +217,13 @@ app.post('/api/clients', (req, res) => {
 
 // Mettre à jour un client
 app.put('/api/clients/:id', (req, res) => {
-  const { nom, prenom, email, telephone, adresse, ville, code_postal, pays } = req.body;
+  const { nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien } = req.body;
 
   db.run(
     `UPDATE clients
-     SET nom=?, prenom=?, email=?, telephone=?, adresse=?, ville=?, code_postal=?, pays=?
+     SET nom=?, prenom=?, email=?, telephone=?, adresse=?, ville=?, code_postal=?, pays=?, wallet=?, lien=?
      WHERE id=?`,
-    [nom, prenom, email, telephone, adresse, ville, code_postal, pays, req.params.id],
+    [nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien, req.params.id],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -212,8 +372,8 @@ app.get('/api/colis/:id', (req, res) => {
 // Créer un nouveau colis
 app.post('/api/colis', (req, res) => {
   const {
-    numero_suivi, client_id, statut, poids, dimensions,
-    adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
+    numero_suivi, client_id, statut, poids, dimensions, reference,
+    adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
     notes, produits
   } = req.body;
 
@@ -221,12 +381,12 @@ app.post('/api/colis', (req, res) => {
   const tracking = numero_suivi || `COL${Date.now()}`;
 
   db.run(
-    `INSERT INTO colis (numero_suivi, client_id, statut, poids, dimensions,
-                        adresse_expedition, ville_expedition, code_postal_expedition,
+    `INSERT INTO colis (numero_suivi, client_id, statut, poids, dimensions, reference,
+                        adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition,
                         pays_expedition, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [tracking, client_id, statut || 'En préparation', poids, dimensions,
-     adresse_expedition, ville_expedition, code_postal_expedition,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [tracking, client_id, statut || 'En préparation', poids, dimensions, reference,
+     adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition,
      pays_expedition || 'France', notes],
     function(err) {
       if (err) {
@@ -255,19 +415,19 @@ app.post('/api/colis', (req, res) => {
 // Mettre à jour un colis
 app.put('/api/colis/:id', (req, res) => {
   const {
-    numero_suivi, statut, poids, dimensions,
-    adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
+    numero_suivi, statut, poids, dimensions, reference,
+    adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
     date_expedition, date_livraison, notes
   } = req.body;
 
   db.run(
     `UPDATE colis
-     SET numero_suivi=?, statut=?, poids=?, dimensions=?,
-         adresse_expedition=?, ville_expedition=?, code_postal_expedition=?, pays_expedition=?,
+     SET numero_suivi=?, statut=?, poids=?, dimensions=?, reference=?,
+         adresse_expedition=?, adresse_ligne2=?, ville_expedition=?, code_postal_expedition=?, pays_expedition=?,
          date_expedition=?, date_livraison=?, notes=?
      WHERE id=?`,
-    [numero_suivi, statut, poids, dimensions,
-     adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
+    [numero_suivi, statut, poids, dimensions, reference,
+     adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
      date_expedition, date_livraison, notes, req.params.id],
     function(err) {
       if (err) {
@@ -293,7 +453,7 @@ app.delete('/api/colis/:id', (req, res) => {
 // ============= GÉNÉRATION D'ÉTIQUETTES PDF =============
 
 app.post('/api/etiquettes/pdf', (req, res) => {
-  const { colisIds } = req.body;
+  const { colisIds, logoData } = req.body;
 
   if (!colisIds || colisIds.length === 0) {
     res.status(400).json({ error: 'Aucun colis sélectionné' });
@@ -321,52 +481,132 @@ app.post('/api/etiquettes/pdf', (req, res) => {
       return;
     }
 
-    // Créer le PDF
-    const doc = new PDFDocument({ size: 'A4', margin: 30 });
+    // Créer le PDF en format A4 sans marge
+    const doc = new PDFDocument({ size: 'A4', margin: 0 });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=etiquettes.pdf');
 
     doc.pipe(res);
 
+    // Dimensions pour 6 étiquettes par page (2 colonnes x 3 lignes)
+    const pageWidth = 595; // A4 width in points
+    const pageHeight = 842; // A4 height in points
+    const labelWidth = pageWidth / 2; // 297.5 points
+    const labelHeight = pageHeight / 3; // ~280.67 points
+    const margin = 10; // Marge interne de chaque étiquette
+
     colisList.forEach((colis, index) => {
-      if (index > 0) {
+      // Calculer la position sur la page
+      const pageIndex = Math.floor(index / 6);
+      const positionOnPage = index % 6;
+      const col = positionOnPage % 2;
+      const row = Math.floor(positionOnPage / 2);
+
+      // Créer une nouvelle page tous les 6 colis
+      if (index > 0 && positionOnPage === 0) {
         doc.addPage();
       }
 
-      // Bordure
-      doc.rect(30, 30, 535, 350).stroke();
+      // Calculer les coordonnées de départ de l'étiquette
+      const startX = col * labelWidth;
+      const startY = row * labelHeight;
 
-      // Titre
-      doc.fontSize(20).font('Helvetica-Bold').text('ÉTIQUETTE D\'EXPÉDITION', 50, 50);
+      // Bordure de l'étiquette
+      doc.rect(startX, startY, labelWidth, labelHeight).stroke();
+
+      let currentY = startY + margin;
+
+      // Logo (si disponible)
+      if (logoData) {
+        try {
+          const logoBuffer = Buffer.from(logoData.split(',')[1], 'base64');
+          doc.image(logoBuffer, startX + margin, currentY, { width: labelWidth - 2 * margin, height: 40, fit: [labelWidth - 2 * margin, 40] });
+          currentY += 45;
+        } catch (e) {
+          // Si erreur de logo, on continue sans
+          console.error('Erreur chargement logo:', e.message);
+        }
+      }
 
       // Numéro de suivi
-      doc.fontSize(14).font('Helvetica').text('N° de suivi:', 50, 90);
-      doc.fontSize(16).font('Helvetica-Bold').text(colis.numero_suivi || 'N/A', 50, 110);
+      doc.fontSize(10).font('Helvetica-Bold').text('N° Suivi:', startX + margin, currentY, { width: labelWidth - 2 * margin });
+      currentY += 12;
+      doc.fontSize(9).font('Helvetica').text(colis.numero_suivi || 'N/A', startX + margin, currentY, { width: labelWidth - 2 * margin });
+      currentY += 12;
 
-      // Code-barres simulé (texte)
-      doc.fontSize(10).font('Courier').text(`||||| ${colis.numero_suivi} |||||`, 50, 135);
+      // Code-barres simulé
+      doc.fontSize(8).font('Courier').text(`||| ${colis.numero_suivi || 'N/A'} |||`, startX + margin, currentY, { width: labelWidth - 2 * margin, align: 'center' });
+      currentY += 15;
 
-      // Destinataire
-      doc.fontSize(12).font('Helvetica-Bold').text('DESTINATAIRE:', 50, 170);
-      doc.fontSize(11).font('Helvetica');
-      doc.text(`${colis.client_nom || ''} ${colis.client_prenom || ''}`, 50, 190);
-      doc.text(colis.adresse_expedition || colis.client_adresse || '', 50, 210, { width: 250 });
-      doc.text(`${colis.code_postal_expedition || colis.client_code_postal || ''} ${colis.ville_expedition || colis.client_ville || ''}`, 50, 250);
-      doc.text(colis.pays_expedition || colis.client_pays || 'France', 50, 270);
+      // Ligne de séparation
+      doc.moveTo(startX + margin, currentY).lineTo(startX + labelWidth - margin, currentY).stroke();
+      currentY += 5;
 
-      // Informations colis
-      doc.fontSize(12).font('Helvetica-Bold').text('INFORMATIONS COLIS:', 350, 170);
-      doc.fontSize(10).font('Helvetica');
-      doc.text(`Statut: ${colis.statut}`, 350, 190);
-      doc.text(`Poids: ${colis.poids || 'N/A'} kg`, 350, 210);
-      doc.text(`Dimensions: ${colis.dimensions || 'N/A'}`, 350, 230);
-      doc.text(`Date: ${new Date().toLocaleDateString('fr-FR')}`, 350, 250);
+      // DESTINATAIRE
+      doc.fontSize(9).font('Helvetica-Bold').text('DESTINATAIRE:', startX + margin, currentY, { width: labelWidth - 2 * margin });
+      currentY += 12;
 
-      // Notes
-      if (colis.notes) {
-        doc.fontSize(10).font('Helvetica-Bold').text('Notes:', 50, 310);
-        doc.fontSize(9).font('Helvetica').text(colis.notes, 50, 330, { width: 500 });
+      // Nom + Prénom
+      doc.fontSize(9).font('Helvetica-Bold').text(
+        `${colis.client_nom || ''} ${colis.client_prenom || ''}`.trim(),
+        startX + margin,
+        currentY,
+        { width: labelWidth - 2 * margin }
+      );
+      currentY += 12;
+
+      // Adresse (ligne 1)
+      doc.fontSize(8).font('Helvetica').text(
+        colis.adresse_expedition || colis.client_adresse || '',
+        startX + margin,
+        currentY,
+        { width: labelWidth - 2 * margin }
+      );
+      currentY += 10;
+
+      // Adresse (ligne 2) - si présente
+      if (colis.adresse_ligne2) {
+        doc.text(
+          colis.adresse_ligne2,
+          startX + margin,
+          currentY,
+          { width: labelWidth - 2 * margin }
+        );
+        currentY += 10;
+      } else {
+        currentY += 10;
+      }
+
+      // Code postal + Ville
+      doc.text(
+        `${colis.code_postal_expedition || colis.client_code_postal || ''} ${colis.ville_expedition || colis.client_ville || ''}`.trim(),
+        startX + margin,
+        currentY,
+        { width: labelWidth - 2 * margin }
+      );
+      currentY += 10;
+
+      // Pays
+      doc.text(colis.pays_expedition || colis.client_pays || 'France', startX + margin, currentY, { width: labelWidth - 2 * margin });
+      currentY += 15;
+
+      // Ligne de séparation
+      doc.moveTo(startX + margin, currentY).lineTo(startX + labelWidth - margin, currentY).stroke();
+      currentY += 5;
+
+      // Informations colis (plus compact)
+      doc.fontSize(7).font('Helvetica').text(
+        `Poids: ${colis.poids || 'N/A'} kg | Dim: ${colis.dimensions || 'N/A'}`,
+        startX + margin,
+        currentY,
+        { width: labelWidth - 2 * margin }
+      );
+      currentY += 10;
+
+      // Référence (au lieu des notes)
+      if (colis.reference) {
+        doc.fontSize(9).font('Helvetica-Bold').text(`Ref: ${colis.reference}`, startX + margin, currentY, { width: labelWidth - 2 * margin });
       }
     });
 
@@ -402,6 +642,63 @@ app.get('/api/stats', (req, res) => {
         });
       });
     });
+  });
+});
+
+// ============= EXPORT / RESET DATABASE =============
+
+// Exporter la base de données
+app.get('/api/database/export', (req, res) => {
+  const dbPath = path.join(__dirname, 'crm.db');
+
+  if (!fs.existsSync(dbPath)) {
+    return res.status(404).json({ error: 'Base de données non trouvée' });
+  }
+
+  res.download(dbPath, `crm-backup-${Date.now()}.db`, (err) => {
+    if (err) {
+      console.error('Erreur export base de données:', err);
+      res.status(500).json({ error: 'Erreur lors de l\'export' });
+    }
+  });
+});
+
+// Réinitialiser la base de données
+app.post('/api/database/reset', (req, res) => {
+  const tables = ['colis_produits', 'colis', 'produits', 'clients'];
+
+  let completedCount = 0;
+  const errors = [];
+
+  tables.forEach(table => {
+    db.run(`DELETE FROM ${table}`, [], function(err) {
+      if (err) {
+        errors.push({ table, error: err.message });
+      }
+      completedCount++;
+
+      if (completedCount === tables.length) {
+        if (errors.length > 0) {
+          res.status(500).json({ error: 'Erreur lors de la réinitialisation', details: errors });
+        } else {
+          res.json({ message: 'Base de données réinitialisée avec succès' });
+        }
+      }
+    });
+  });
+});
+
+// Initialiser avec des données de test
+app.post('/api/database/init-test-data', (req, res) => {
+  const { exec } = require('child_process');
+
+  exec('node init-test-data.js', { cwd: __dirname }, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Erreur init données de test:', error);
+      return res.status(500).json({ error: 'Erreur lors de l\'initialisation', details: stderr });
+    }
+
+    res.json({ message: 'Données de test créées avec succès', output: stdout });
   });
 });
 

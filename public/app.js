@@ -96,6 +96,10 @@ function updateClientSelect() {
 function showAddClientModal() {
     document.getElementById('formClient').reset();
     document.getElementById('clientId').value = '';
+    clearWalletsAndLiens();
+    // Ajouter au moins un champ vide pour chaque
+    addWalletField();
+    addLienField();
     document.getElementById('modalClient').classList.add('active');
 }
 
@@ -113,6 +117,44 @@ function editClient(id) {
     document.getElementById('clientCodePostal').value = client.code_postal || '';
     document.getElementById('clientPays').value = client.pays || 'France';
 
+    // Charger les wallets et liens multiples
+    clearWalletsAndLiens();
+
+    // Parser les wallets (stockés en JSON)
+    let wallets = [];
+    try {
+        if (client.wallet) {
+            wallets = JSON.parse(client.wallet);
+            if (!Array.isArray(wallets)) wallets = [client.wallet];
+        }
+    } catch (e) {
+        if (client.wallet) wallets = [client.wallet];
+    }
+
+    // Parser les liens (stockés en JSON)
+    let liens = [];
+    try {
+        if (client.lien) {
+            liens = JSON.parse(client.lien);
+            if (!Array.isArray(liens)) liens = [client.lien];
+        }
+    } catch (e) {
+        if (client.lien) liens = [client.lien];
+    }
+
+    // Ajouter les champs
+    if (wallets.length > 0) {
+        wallets.forEach(w => addWalletField(w));
+    } else {
+        addWalletField();
+    }
+
+    if (liens.length > 0) {
+        liens.forEach(l => addLienField(l));
+    } else {
+        addLienField();
+    }
+
     document.getElementById('modalClient').classList.add('active');
 }
 
@@ -120,6 +162,11 @@ async function saveClient(event) {
     event.preventDefault();
 
     const id = document.getElementById('clientId').value;
+
+    // Récupérer les wallets et liens multiples
+    const wallets = getWalletsFromForm();
+    const liens = getLiensFromForm();
+
     const data = {
         nom: document.getElementById('clientNom').value,
         prenom: document.getElementById('clientPrenom').value,
@@ -128,7 +175,9 @@ async function saveClient(event) {
         adresse: document.getElementById('clientAdresse').value,
         ville: document.getElementById('clientVille').value,
         code_postal: document.getElementById('clientCodePostal').value,
-        pays: document.getElementById('clientPays').value
+        pays: document.getElementById('clientPays').value,
+        wallet: JSON.stringify(wallets),
+        lien: JSON.stringify(liens)
     };
 
     try {
@@ -166,6 +215,166 @@ async function deleteClient(id) {
     } catch (error) {
         console.error('Erreur suppression client:', error);
     }
+}
+
+async function viewClientDetails(clientId) {
+    try {
+        const response = await fetch(`${API_URL}/api/clients/${clientId}`);
+        const client = await response.json();
+
+        if (!client) {
+            alert('Client introuvable');
+            return;
+        }
+
+        // Parser les wallets et liens
+        let wallets = [];
+        try {
+            if (client.wallet) {
+                wallets = JSON.parse(client.wallet);
+                if (!Array.isArray(wallets)) wallets = [client.wallet];
+            }
+        } catch (e) {
+            if (client.wallet) wallets = [client.wallet];
+        }
+
+        let liens = [];
+        try {
+            if (client.lien) {
+                liens = JSON.parse(client.lien);
+                if (!Array.isArray(liens)) liens = [client.lien];
+            }
+        } catch (e) {
+            if (client.lien) liens = [client.lien];
+        }
+
+        // Générer le HTML pour les wallets
+        const walletsHtml = wallets.length > 0 ? `
+            <div>
+                <strong>Wallets:</strong><br>
+                ${wallets.map(w => `<code style="background: #f0f0f0; padding: 5px; border-radius: 3px; display: block; margin-top: 5px; word-break: break-all;">${w}</code>`).join('')}
+            </div>
+        ` : '';
+
+        // Générer le HTML pour les liens
+        const liensHtml = liens.length > 0 ? `
+            <div>
+                <strong>Profils externes:</strong><br>
+                ${liens.map(l => `<a href="${l}" target="_blank" class="product-link" style="display: block; margin-top: 5px;">${l}</a>`).join('')}
+            </div>
+        ` : '';
+
+        const detailsHtml = `
+            <div style="display: grid; gap: 15px;">
+                <div>
+                    <strong>Nom complet:</strong><br>
+                    ${client.nom} ${client.prenom || ''}
+                </div>
+                <div>
+                    <strong>Email:</strong><br>
+                    ${client.email ? `<a href="mailto:${client.email}">${client.email}</a>` : '-'}
+                </div>
+                <div>
+                    <strong>Téléphone:</strong><br>
+                    ${client.telephone ? `<a href="tel:${client.telephone}">${client.telephone}</a>` : '-'}
+                </div>
+                <div>
+                    <strong>Adresse:</strong><br>
+                    ${client.adresse || '-'}<br>
+                    ${client.code_postal || ''} ${client.ville || ''}<br>
+                    ${client.pays || 'France'}
+                </div>
+                ${walletsHtml}
+                ${liensHtml}
+            </div>
+        `;
+
+        document.getElementById('clientDetailsContent').innerHTML = detailsHtml;
+
+        // Store the client ID for editing
+        window.currentClientDetailsId = clientId;
+
+        document.getElementById('modalClientDetails').classList.add('active');
+    } catch (error) {
+        console.error('Erreur chargement détails client:', error);
+        alert('Erreur lors du chargement des détails');
+    }
+}
+
+function editClientFromDetails() {
+    if (window.currentClientDetailsId) {
+        closeModal('modalClientDetails');
+        editClient(window.currentClientDetailsId);
+    }
+}
+
+// ============= GESTION WALLETS/LIENS MULTIPLES =============
+
+let walletCounter = 0;
+let lienCounter = 0;
+
+function addWalletField(value = '') {
+    const container = document.getElementById('walletsContainer');
+    const id = `wallet_${walletCounter++}`;
+
+    const div = document.createElement('div');
+    div.className = 'form-group';
+    div.id = `container_${id}`;
+    div.innerHTML = `
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" class="wallet-input" id="${id}" placeholder="Adresse wallet" value="${value}" style="flex: 1;">
+            <button type="button" class="btn btn-danger btn-small" onclick="removeField('container_${id}')">🗑️</button>
+        </div>
+    `;
+    container.appendChild(div);
+}
+
+function addLienField(value = '') {
+    const container = document.getElementById('liensContainer');
+    const id = `lien_${lienCounter++}`;
+
+    const div = document.createElement('div');
+    div.className = 'form-group';
+    div.id = `container_${id}`;
+    div.innerHTML = `
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="url" class="lien-input" id="${id}" placeholder="https://..." value="${value}" style="flex: 1;">
+            <button type="button" class="btn btn-danger btn-small" onclick="removeField('container_${id}')">🗑️</button>
+        </div>
+    `;
+    container.appendChild(div);
+}
+
+function removeField(containerId) {
+    const element = document.getElementById(containerId);
+    if (element) {
+        element.remove();
+    }
+}
+
+function clearWalletsAndLiens() {
+    document.getElementById('walletsContainer').innerHTML = '';
+    document.getElementById('liensContainer').innerHTML = '';
+    walletCounter = 0;
+    lienCounter = 0;
+}
+
+function getWalletsFromForm() {
+    const wallets = [];
+    document.querySelectorAll('.wallet-input').forEach(input => {
+        const value = input.value.trim();
+        if (value) wallets.push(value);
+    });
+    return wallets;
+}
+
+function getLiensFromForm() {
+    const liens = [];
+    document.querySelectorAll('.lien-input').forEach(input => {
+        const value = input.value.trim();
+        if (value) liens.push(value);
+    });
+    return liens;
 }
 
 // ============= PRODUITS =============
@@ -285,28 +494,93 @@ async function loadColis() {
 }
 
 function displayColis() {
-    const tbody = document.getElementById('colisTableBody');
+    // Séparer les colis en deux catégories
+    const colisEnAttente = colis.filter(c =>
+        c.statut === 'En préparation' || c.statut === 'Prêt à expédier'
+    );
+    const colisExpedies = colis.filter(c =>
+        c.statut === 'Expédié' || c.statut === 'En transit' || c.statut === 'Livré'
+    );
 
-    if (colis.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty">Aucun colis</td></tr>';
-        return;
+    // Afficher les compteurs
+    document.getElementById('countEnAttente').textContent = colisEnAttente.length;
+    document.getElementById('countExpedies').textContent = colisExpedies.length;
+
+    // Afficher colis en attente
+    const tbodyAttente = document.getElementById('colisEnAttenteBody');
+    if (colisEnAttente.length === 0) {
+        tbodyAttente.innerHTML = '<tr><td colspan="8" class="empty">Aucun colis en attente</td></tr>';
+    } else {
+        tbodyAttente.innerHTML = colisEnAttente.map(c => renderColisRow(c, 'attente')).join('');
     }
 
-    tbody.innerHTML = colis.map(c => `
-        <tr>
-            <td><input type="checkbox" class="colis-checkbox" value="${c.id}" onchange="updateSelection()"></td>
-            <td><strong>${c.numero_suivi || 'N/A'}</strong></td>
-            <td>${c.client_nom} ${c.client_prenom || ''}</td>
+    // Afficher colis expédiés
+    const tbodyExpedies = document.getElementById('colisExpediesBody');
+    if (colisExpedies.length === 0) {
+        tbodyExpedies.innerHTML = '<tr><td colspan="8" class="empty">Aucun colis envoyé</td></tr>';
+    } else {
+        tbodyExpedies.innerHTML = colisExpedies.map(c => renderColisRow(c, 'expedies')).join('');
+    }
+}
+
+function parseNotesData(notes) {
+    const data = { item: '', lien: '' };
+    if (!notes) return data;
+
+    const lines = notes.split('\n');
+    lines.forEach(line => {
+        if (line.startsWith('Item: ')) {
+            data.item = line.replace('Item: ', '').trim();
+        } else if (line.startsWith('Lien: ')) {
+            data.lien = line.replace('Lien: ', '').trim();
+        }
+    });
+    return data;
+}
+
+function renderColisRow(c, section) {
+    const notesData = parseNotesData(c.notes);
+    const isNonFrance = (c.pays_expedition && c.pays_expedition.toLowerCase() !== 'france');
+    const rowClass = isNonFrance ? 'non-france' : '';
+
+    // Formater la date
+    const date = new Date(c.date_creation);
+    const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    // Produit avec lien cliquable
+    let produitHtml = '';
+    if (notesData.item && notesData.lien) {
+        produitHtml = `<a href="${notesData.lien}" target="_blank" class="product-link">${notesData.item}</a>`;
+    } else if (notesData.item) {
+        produitHtml = `<span class="product-name">${notesData.item}</span>`;
+    } else {
+        produitHtml = '<span style="color: #999;">-</span>';
+    }
+
+    // Client et adresse
+    const clientNom = `${c.client_nom || ''} ${c.client_prenom || ''}`.trim();
+    const adresse = c.ville_expedition || c.adresse_expedition || '';
+    const pays = c.pays_expedition || 'France';
+    const clientHtml = `
+        <span class="client-name" style="cursor: pointer; color: #667eea;" onclick="viewClientDetails(${c.client_id})">${clientNom}</span>
+        <span class="client-address">${adresse}${pays !== 'France' ? ` - ${pays}` : ''}</span>
+    `;
+
+    return `
+        <tr class="${rowClass}">
+            <td><input type="checkbox" class="colis-checkbox colis-checkbox-${section}" value="${c.id}" onchange="updateSelection()"></td>
+            <td>${dateStr}</td>
+            <td>${produitHtml}</td>
+            <td>${clientHtml}</td>
             <td><span class="badge badge-${getStatutClass(c.statut)}">${c.statut}</span></td>
-            <td>${c.poids ? c.poids + ' kg' : ''}</td>
-            <td>${c.ville_expedition || ''} ${c.code_postal_expedition || ''}</td>
-            <td>${new Date(c.date_creation).toLocaleDateString('fr-FR')}</td>
+            <td>${c.poids ? c.poids + ' kg' : '-'}</td>
+            <td><strong>${c.numero_suivi || 'N/A'}</strong></td>
             <td class="actions">
                 <button class="btn btn-edit btn-small" onclick="editColis(${c.id})">✏️</button>
                 <button class="btn btn-danger btn-small" onclick="deleteColis(${c.id})">🗑️</button>
             </td>
         </tr>
-    `).join('');
+    `;
 }
 
 function getStatutClass(statut) {
@@ -338,6 +612,10 @@ function fillClientAddress() {
     }
 }
 
+function setDimension(dimension) {
+    document.getElementById('colisDimensions').value = dimension + 'cm';
+}
+
 function editColis(id) {
     const c = colis.find(col => col.id === id);
     if (!c) return;
@@ -348,7 +626,9 @@ function editColis(id) {
     document.getElementById('colisStatut').value = c.statut;
     document.getElementById('colisPoids').value = c.poids || '';
     document.getElementById('colisDimensions').value = c.dimensions || '';
+    document.getElementById('colisReference').value = c.reference || '';
     document.getElementById('colisAdresse').value = c.adresse_expedition || '';
+    document.getElementById('colisAdresseLigne2').value = c.adresse_ligne2 || '';
     document.getElementById('colisVille').value = c.ville_expedition || '';
     document.getElementById('colisCodePostal').value = c.code_postal_expedition || '';
     document.getElementById('colisPays').value = c.pays_expedition || 'France';
@@ -367,7 +647,9 @@ async function saveColis(event) {
         statut: document.getElementById('colisStatut').value,
         poids: parseFloat(document.getElementById('colisPoids').value) || null,
         dimensions: document.getElementById('colisDimensions').value,
+        reference: document.getElementById('colisReference').value,
         adresse_expedition: document.getElementById('colisAdresse').value,
+        adresse_ligne2: document.getElementById('colisAdresseLigne2').value,
         ville_expedition: document.getElementById('colisVille').value,
         code_postal_expedition: document.getElementById('colisCodePostal').value,
         pays_expedition: document.getElementById('colisPays').value,
@@ -413,15 +695,31 @@ async function deleteColis(id) {
 
 // ============= SÉLECTION MULTIPLE =============
 
-function toggleSelectAll() {
-    const selectAll = document.getElementById('selectAllColis');
-    const checkboxes = document.querySelectorAll('.colis-checkbox');
+function toggleSelectAll(section) {
+    const selectAll = event.target;
+    const checkboxes = document.querySelectorAll(`.colis-checkbox-${section}`);
 
     checkboxes.forEach(cb => {
         cb.checked = selectAll.checked;
     });
 
     updateSelection();
+}
+
+// Toggle section collapsible
+function toggleSection(sectionId) {
+    const section = document.getElementById(`section${sectionId.charAt(0).toUpperCase() + sectionId.slice(1)}`);
+    const icon = document.getElementById(`toggle${sectionId.charAt(0).toUpperCase() + sectionId.slice(1)}`);
+
+    if (section.classList.contains('collapsed')) {
+        section.classList.remove('collapsed');
+        icon.classList.remove('rotated');
+        icon.textContent = '▼';
+    } else {
+        section.classList.add('collapsed');
+        icon.classList.add('rotated');
+        icon.textContent = '►';
+    }
 }
 
 function updateSelection() {
@@ -443,10 +741,16 @@ async function imprimerEtiquettesSelection() {
     }
 
     try {
+        // Récupérer le logo depuis localStorage
+        const logoData = localStorage.getItem('shippingLogo');
+
         const response = await fetch(`${API_URL}/api/etiquettes/pdf`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ colisIds: Array.from(selectedColis) })
+            body: JSON.stringify({
+                colisIds: Array.from(selectedColis),
+                logoData: logoData
+            })
         });
 
         if (response.ok) {
@@ -460,7 +764,7 @@ async function imprimerEtiquettesSelection() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
-            alert(`${selectedColis.size} étiquette(s) générée(s) avec succès!`);
+            alert(`${selectedColis.size} étiquette(s) générée(s) avec succès!\n\nFormat: 6 étiquettes par page (2x3)`);
         } else {
             alert('Erreur lors de la génération du PDF');
         }
@@ -481,4 +785,290 @@ window.onclick = function(event) {
     if (event.target.classList.contains('modal')) {
         event.target.classList.remove('active');
     }
+}
+
+// ============= PLANNING & CSV IMPORT =============
+
+// Afficher le nom du fichier sélectionné
+document.addEventListener('DOMContentLoaded', () => {
+    const fileInput = document.getElementById('csvFile');
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            const fileName = e.target.files[0]?.name || 'Choisir un fichier CSV...';
+            document.getElementById('fileNameDisplay').textContent = fileName;
+        });
+    }
+});
+
+// Upload et import du CSV
+async function uploadCSV(event) {
+    event.preventDefault();
+
+    const fileInput = document.getElementById('csvFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert('Veuillez sélectionner un fichier CSV');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('csvFile', file);
+
+    const uploadBtn = document.getElementById('uploadBtn');
+    const originalText = uploadBtn.innerHTML;
+    uploadBtn.innerHTML = '<span class="loading"></span> Import en cours...';
+    uploadBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_URL}/api/import/csv`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        // Afficher le résultat
+        const resultDiv = document.getElementById('importResult');
+        const contentDiv = document.getElementById('importResultContent');
+
+        if (response.ok) {
+            contentDiv.innerHTML = `
+                <p class="import-success">✅ Import réussi!</p>
+                <p>Total de lignes: <strong>${result.total}</strong></p>
+                <p>Colis créés avec succès: <strong>${result.success}</strong></p>
+                ${result.errors > 0 ? `<p class="import-error">Erreurs: <strong>${result.errors}</strong></p>` : ''}
+                ${result.errorDetails && result.errorDetails.length > 0 ? `
+                    <details style="margin-top: 10px;">
+                        <summary style="cursor: pointer;">Voir les erreurs</summary>
+                        <ul style="margin-top: 10px;">
+                            ${result.errorDetails.map(err => `<li>Ligne ${err.row}: ${err.error}</li>`).join('')}
+                        </ul>
+                    </details>
+                ` : ''}
+            `;
+            resultDiv.style.display = 'block';
+
+            // Rafraîchir les données
+            loadStats();
+            loadClients();
+            loadColis();
+
+            // Réinitialiser le formulaire
+            document.getElementById('csvUploadForm').reset();
+            document.getElementById('fileNameDisplay').textContent = 'Choisir un fichier CSV...';
+        } else {
+            contentDiv.innerHTML = `
+                <p class="import-error">❌ Erreur lors de l'import</p>
+                <p>${result.error || 'Une erreur est survenue'}</p>
+            `;
+            resultDiv.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Erreur upload CSV:', error);
+        const resultDiv = document.getElementById('importResult');
+        const contentDiv = document.getElementById('importResultContent');
+        contentDiv.innerHTML = `
+            <p class="import-error">❌ Erreur réseau</p>
+            <p>${error.message}</p>
+        `;
+        resultDiv.style.display = 'block';
+    } finally {
+        uploadBtn.innerHTML = originalText;
+        uploadBtn.disabled = false;
+    }
+}
+
+// Télécharger un modèle CSV
+function downloadExampleCSV() {
+    const csvContent = `Item,Lien,Prix Objet (€),Poids (kg),Adresse d'envoi,Lien de suivi colis,Photos/Vidéos associées,Statut,Timestamp,N° Colis/mois,Note
+Smartphone XYZ,https://example.com/product/123,299.99,0.5,"123 Rue de la Paix, 75001 Paris, France",COL2024010001,https://photos.example.com/1,En préparation,2024-01-05T10:00:00,COL-01-2024,Fragile - Manipuler avec soin
+Ordinateur Portable ABC,https://example.com/product/456,899.00,2.3,"456 Avenue des Champs, 69001 Lyon, France",COL2024010002,https://photos.example.com/2,Expédié,2024-01-04T15:30:00,COL-02-2024,Garantie 2 ans incluse
+Casque Audio,https://example.com/product/789,149.50,0.3,"789 Boulevard Victor Hugo, 33000 Bordeaux, France",,https://photos.example.com/3,Livré,2024-01-03T09:15:00,COL-03-2024,Client VIP`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'modele_import_colis.csv');
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// ============= DATABASE TOOLS =============
+
+// Charger des données de test
+async function initTestData() {
+    if (!confirm('Voulez-vous charger des données de test?\n\nCela créera:\n- 5 clients (France, Belgique, Italie, Espagne)\n- 6 produits (téléphones, ordinateurs, etc.)\n- 6 colis de test\n\nNote: Si des données existent déjà, elles seront conservées.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/database/init-test-data`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+        const resultDiv = document.getElementById('dbToolsResult');
+        const contentDiv = document.getElementById('dbToolsResultContent');
+
+        if (response.ok) {
+            contentDiv.innerHTML = `
+                <p class="import-success">✅ ${result.message}</p>
+                <pre style="margin-top: 10px; font-size: 0.9em;">${result.output}</pre>
+            `;
+            resultDiv.style.display = 'block';
+
+            // Rafraîchir les données
+            setTimeout(() => {
+                loadStats();
+                loadClients();
+                loadProduits();
+                loadColis();
+            }, 500);
+        } else {
+            contentDiv.innerHTML = `
+                <p class="import-error">❌ Erreur</p>
+                <p>${result.error}</p>
+            `;
+            resultDiv.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Erreur init données test:', error);
+        alert('Erreur lors du chargement des données de test');
+    }
+}
+
+// Exporter la base de données
+function exportDatabase() {
+    window.location.href = `${API_URL}/api/database/export`;
+
+    const resultDiv = document.getElementById('dbToolsResult');
+    const contentDiv = document.getElementById('dbToolsResultContent');
+    contentDiv.innerHTML = `
+        <p class="import-success">✅ Export en cours...</p>
+        <p>Le téléchargement devrait commencer automatiquement.</p>
+    `;
+    resultDiv.style.display = 'block';
+
+    setTimeout(() => {
+        resultDiv.style.display = 'none';
+    }, 3000);
+}
+
+// Réinitialiser la base de données
+async function resetDatabase() {
+    if (!confirm('⚠️ ATTENTION ⚠️\n\nÊtes-vous sûr de vouloir réinitialiser la base de données?\n\nCette action supprimera TOUTES les données:\n- Tous les clients\n- Tous les produits\n- Tous les colis\n\nCette action est IRRÉVERSIBLE!')) {
+        return;
+    }
+
+    if (!confirm('Dernière confirmation:\n\nToutes les données seront perdues.\n\nContinuer?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/database/reset`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+        const resultDiv = document.getElementById('dbToolsResult');
+        const contentDiv = document.getElementById('dbToolsResultContent');
+
+        if (response.ok) {
+            contentDiv.innerHTML = `
+                <p class="import-success">✅ ${result.message}</p>
+                <p>La base de données a été vidée.</p>
+            `;
+            resultDiv.style.display = 'block';
+
+            // Rafraîchir les données
+            setTimeout(() => {
+                loadStats();
+                loadClients();
+                loadProduits();
+                loadColis();
+            }, 500);
+        } else {
+            contentDiv.innerHTML = `
+                <p class="import-error">❌ Erreur</p>
+                <p>${result.error}</p>
+            `;
+            resultDiv.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Erreur reset base de données:', error);
+        alert('Erreur lors de la réinitialisation');
+    }
+}
+
+// ============= LOGO MANAGEMENT =============
+
+// Charger le logo au démarrage
+document.addEventListener('DOMContentLoaded', () => {
+    loadLogo();
+});
+
+function loadLogo() {
+    const logoData = localStorage.getItem('shippingLogo');
+    if (logoData) {
+        document.getElementById('logoImage').src = logoData;
+        document.getElementById('logoImage').style.display = 'block';
+        document.getElementById('logoPlaceholder').style.display = 'none';
+        document.getElementById('btnRemoveLogo').style.display = 'inline-block';
+    }
+}
+
+function uploadLogo() {
+    const fileInput = document.getElementById('logoFileInput');
+    const file = fileInput.files[0];
+
+    if (!file) return;
+
+    // Vérifier le type de fichier
+    if (!file.type.match('image/(png|jpeg|jpg)')) {
+        alert('Format de fichier non supporté. Utilisez PNG, JPG ou JPEG.');
+        return;
+    }
+
+    // Vérifier la taille (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+        alert('Le fichier est trop volumineux. Taille maximum: 2MB');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const logoData = e.target.result;
+
+        // Sauvegarder dans localStorage
+        localStorage.setItem('shippingLogo', logoData);
+
+        // Afficher le logo
+        document.getElementById('logoImage').src = logoData;
+        document.getElementById('logoImage').style.display = 'block';
+        document.getElementById('logoPlaceholder').style.display = 'none';
+        document.getElementById('btnRemoveLogo').style.display = 'inline-block';
+
+        alert('Logo uploadé avec succès!');
+    };
+
+    reader.readAsDataURL(file);
+}
+
+function removeLogo() {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer le logo?')) return;
+
+    localStorage.removeItem('shippingLogo');
+    document.getElementById('logoImage').src = '';
+    document.getElementById('logoImage').style.display = 'none';
+    document.getElementById('logoPlaceholder').style.display = 'block';
+    document.getElementById('btnRemoveLogo').style.display = 'none';
+    document.getElementById('logoFileInput').value = '';
+
+    alert('Logo supprimé');
 }
