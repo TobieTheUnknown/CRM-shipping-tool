@@ -95,7 +95,7 @@ function insertColis() {
       {
         client_id: 2,
         numero_suivi: 'FR2026010002',
-        statut: 'Prêt à expédier',
+        statut: 'Out of stock',
         poids: 0.1,
         dimensions: '10x8x4cm',
         reference: 'REF-2026-002',
@@ -104,7 +104,7 @@ function insertColis() {
       {
         client_id: 3,
         numero_suivi: 'BE2026010003',
-        statut: 'Expédié',
+        statut: 'Envoyé',
         poids: 0.45,
         dimensions: '16x11x6cm',
         reference: 'REF-2026-003',
@@ -114,7 +114,7 @@ function insertColis() {
       {
         client_id: 4,
         numero_suivi: 'IT2026010004',
-        statut: 'En transit',
+        statut: 'Envoyé',
         poids: 2.1,
         dimensions: '45x30x10cm',
         reference: 'REF-2026-004',
@@ -124,7 +124,7 @@ function insertColis() {
       {
         client_id: 5,
         numero_suivi: 'ES2026010005',
-        statut: 'Livré',
+        statut: 'Envoyé',
         poids: 0.6,
         dimensions: '30x25x3cm',
         reference: 'REF-2026-005',
@@ -135,13 +135,11 @@ function insertColis() {
       {
         client_id: 1,
         numero_suivi: 'FR2026010006',
-        statut: 'Livré',
+        statut: 'Incomplet',
         poids: 0.15,
         dimensions: '12x10x5cm',
         reference: 'REF-2026-006',
-        notes: 'Client satisfait\nItem: Apple Watch Series 9\nLien: https://www.apple.com/fr/apple-watch-series-9/\nPrix: 449€\nN° Colis/mois: COL-06-2026',
-        date_expedition: new Date(Date.now() - 259200000).toISOString(),
-        date_livraison: new Date(Date.now() - 172800000).toISOString()
+        notes: 'Adresse à confirmer\nItem: Apple Watch Series 9\nLien: https://www.apple.com/fr/apple-watch-series-9/\nPrix: 449€\nN° Colis/mois: COL-06-2026'
       }
     ];
 
