@@ -108,6 +108,10 @@
                                 <label>Hauteur (cm)</label>
                                 <input type="number" id="dimensionHauteur" step="0.1" min="0">
                             </div>
+                            <div class="form-group">
+                                <label>Poids carton (kg)</label>
+                                <input type="number" id="dimensionPoidsCarton" step="0.01" min="0" placeholder="0.00">
+                            </div>
                         </div>
                         <div class="tools-buttons" style="margin-top: 15px;">
                             <button class="btn btn-primary" onclick="saveDimension()">
@@ -523,10 +527,34 @@
 
                 <div class="form-group">
                     <label>Dimensions</label>
-                    <input type="text" id="colisDimensions" placeholder="Ex: 30x20x15cm">
+                    <input type="text" id="colisDimensions" placeholder="Ex: 30x20x15cm" readonly>
                     <div class="dimension-buttons" id="dimensionButtons">
                         <!-- Dimensions générées dynamiquement -->
                     </div>
+                </div>
+
+                <h3>Produits du stock</h3>
+                <p style="color: #666; font-size: 13px; margin-bottom: 10px;">
+                    Sélectionnez les produits à inclure dans ce colis (le stock sera automatiquement décrémenté)
+                </p>
+                <div id="colisProduitsContainer" class="colis-produits-container">
+                    <!-- Produits ajoutés dynamiquement -->
+                </div>
+                <div class="form-row" style="align-items: flex-end; margin-top: 10px;">
+                    <div class="form-group" style="flex: 2;">
+                        <label>Ajouter un produit</label>
+                        <select id="selectProduitToAdd">
+                            <option value="">Sélectionner un produit...</option>
+                            <!-- Options générées dynamiquement -->
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 0;">
+                        <button type="button" class="btn btn-secondary" onclick="addProduitToColis()">+ Ajouter</button>
+                    </div>
+                </div>
+                <div id="colisPoidsTotalInfo" style="margin-top: 10px; padding: 10px; background: #f0f7ff; border-radius: 6px; display: none;">
+                    <strong>Poids total calculé:</strong> <span id="colisPoidsTotalValue">0</span> kg
+                    <small style="color: #666; display: block;">(poids des produits + poids du carton)</small>
                 </div>
 
                 <h3>Adresse d'expédition</h3>
@@ -594,6 +622,20 @@
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modalQuickClient')">Annuler</button>
                     <button type="button" class="btn btn-primary" onclick="confirmQuickClient()">✓ Créer ce client</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PRODUITS DU COLIS -->
+    <div id="modalColisProduits" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('modalColisProduits')">&times;</span>
+            <h2>Produits du colis</h2>
+            <div id="colisProduitsListModal" class="produits-list-modal">
+                <!-- Liste des produits générée dynamiquement -->
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modalColisProduits')">Fermer</button>
             </div>
         </div>
     </div>

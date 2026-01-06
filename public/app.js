@@ -5,6 +5,7 @@ let produits = [];
 let colis = [];
 let dimensions = [];
 let selectedColis = new Set();
+let colisProduitsSelection = []; // Produits sélectionnés pour le colis en cours
 
 // ============= INITIALISATION =============
 
@@ -815,9 +816,23 @@ function renderColisRow(c, section) {
     const date = new Date(c.date_creation);
     const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-    // Produit avec lien cliquable
+    // Produit avec lien cliquable - nouveau système avec produits multiples
     let produitHtml = '';
-    if (notesData.item && notesData.lien) {
+    if (c.produits && c.produits.length > 0) {
+        // Afficher les noms des produits
+        const nomsProduitsArr = c.produits.map(p => p.nom || 'Produit');
+        const nomsProduits = nomsProduitsArr.length > 2
+            ? nomsProduitsArr.slice(0, 2).join(', ') + ` (+${nomsProduitsArr.length - 2})`
+            : nomsProduitsArr.join(', ');
+
+        const hasAnyLink = c.produits.some(p => p.lien);
+        if (hasAnyLink || c.produits.length > 1) {
+            produitHtml = `<span class="product-name produit-clickable" onclick="handleProduitClick(${c.id})" title="Cliquez pour voir les détails">${nomsProduits}</span>`;
+        } else if (c.produits.length === 1) {
+            produitHtml = `<span class="product-name">${nomsProduits}</span>`;
+        }
+    } else if (notesData.item && notesData.lien) {
+        // Fallback ancien système
         produitHtml = `<a href="${notesData.lien}" target="_blank" class="product-link">${notesData.item}</a>`;
     } else if (notesData.item) {
         produitHtml = `<span class="product-name">${notesData.item}</span>`;
@@ -864,6 +879,11 @@ function getStatutClass(statut) {
 function showAddColisModal() {
     document.getElementById('formColis').reset();
     document.getElementById('colisId').value = '';
+    // Réinitialiser les produits sélectionnés
+    colisProduitsSelection = [];
+    displayColisProduitsSelection();
+    updateProduitSelect();
+    document.getElementById('colisPoidsTotalInfo').style.display = 'none';
     document.getElementById('modalColis').classList.add('active');
 }
 
@@ -877,10 +897,6 @@ function fillClientAddress() {
         document.getElementById('colisCodePostal').value = client.code_postal || '';
         document.getElementById('colisPays').value = client.pays || 'France';
     }
-}
-
-function setDimension(dimension) {
-    document.getElementById('colisDimensions').value = dimension + 'cm';
 }
 
 function editColis(id) {
@@ -901,6 +917,32 @@ function editColis(id) {
     document.getElementById('colisPays').value = c.pays_expedition || 'France';
     document.getElementById('colisNotes').value = c.notes || '';
 
+    // Charger les produits existants du colis
+    colisProduitsSelection = [];
+    if (c.produits && c.produits.length > 0) {
+        c.produits.forEach(p => {
+            const produit = produits.find(pr => pr.id === p.produit_id);
+            colisProduitsSelection.push({
+                produit_id: p.produit_id,
+                nom: p.nom || (produit ? produit.nom : 'Produit'),
+                poids: p.poids || (produit ? produit.poids : 0) || 0,
+                dimension_id: p.dimension_id || (produit ? produit.dimension_id : null),
+                stock: produit ? produit.stock + p.quantite : p.quantite, // Le stock actuel + la quantité déjà réservée
+                quantite: p.quantite || 1,
+                lien: p.lien || ''
+            });
+        });
+    }
+    displayColisProduitsSelection();
+    updateProduitSelect();
+
+    if (c.poids) {
+        document.getElementById('colisPoidsTotalValue').textContent = c.poids;
+        document.getElementById('colisPoidsTotalInfo').style.display = 'block';
+    } else {
+        document.getElementById('colisPoidsTotalInfo').style.display = 'none';
+    }
+
     document.getElementById('modalColis').classList.add('active');
 }
 
@@ -908,6 +950,14 @@ async function saveColis(event) {
     event.preventDefault();
 
     const id = document.getElementById('colisId').value;
+
+    // Préparer les produits à envoyer
+    const produitsToSend = colisProduitsSelection.map(p => ({
+        produit_id: p.produit_id,
+        quantite: p.quantite,
+        lien: p.lien || null
+    }));
+
     const data = {
         client_id: parseInt(document.getElementById('colisClientId').value),
         numero_suivi: document.getElementById('colisNumeroSuivi').value,
@@ -920,7 +970,8 @@ async function saveColis(event) {
         ville_expedition: document.getElementById('colisVille').value,
         code_postal_expedition: document.getElementById('colisCodePostal').value,
         pays_expedition: document.getElementById('colisPays').value,
-        notes: document.getElementById('colisNotes').value
+        notes: document.getElementById('colisNotes').value,
+        produits: produitsToSend
     };
 
     try {
@@ -936,6 +987,7 @@ async function saveColis(event) {
         if (response.ok) {
             closeModal('modalColis');
             loadColis();
+            loadProduits(); // Recharger les produits pour mettre à jour le stock
             loadStats();
             alert('Colis enregistré avec succès!');
         }
@@ -1471,6 +1523,7 @@ function displayDimensions() {
                 <tr>
                     <th>Nom</th>
                     <th>Dimensions (L×l×H)</th>
+                    <th>Poids carton</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -1479,6 +1532,7 @@ function displayDimensions() {
                     <tr>
                         <td><strong>${d.nom}</strong></td>
                         <td><code>${d.longueur}×${d.largeur}×${d.hauteur} cm</code></td>
+                        <td><code>${d.poids_carton || 0} kg</code></td>
                         <td class="actions">
                             <button class="btn btn-edit btn-small" onclick="editDimension(${d.id})">✏️</button>
                             <button class="btn btn-danger btn-small" onclick="deleteDimension(${d.id})">🗑️</button>
@@ -1523,6 +1577,7 @@ function editDimension(id) {
     document.getElementById('dimensionLongueur').value = dimension.longueur;
     document.getElementById('dimensionLargeur').value = dimension.largeur;
     document.getElementById('dimensionHauteur').value = dimension.hauteur;
+    document.getElementById('dimensionPoidsCarton').value = dimension.poids_carton || 0;
     document.getElementById('dimensionFormTitle').textContent = 'Modifier la dimension';
     document.getElementById('btnCancelDimension').style.display = 'inline-flex';
 }
@@ -1533,6 +1588,7 @@ function cancelDimensionEdit() {
     document.getElementById('dimensionLongueur').value = '';
     document.getElementById('dimensionLargeur').value = '';
     document.getElementById('dimensionHauteur').value = '';
+    document.getElementById('dimensionPoidsCarton').value = '';
     document.getElementById('dimensionFormTitle').textContent = 'Ajouter une dimension';
     document.getElementById('btnCancelDimension').style.display = 'none';
 }
@@ -1543,13 +1599,14 @@ async function saveDimension() {
     const longueur = parseFloat(document.getElementById('dimensionLongueur').value);
     const largeur = parseFloat(document.getElementById('dimensionLargeur').value);
     const hauteur = parseFloat(document.getElementById('dimensionHauteur').value);
+    const poids_carton = parseFloat(document.getElementById('dimensionPoidsCarton').value) || 0;
 
     if (!nom || !longueur || !largeur || !hauteur) {
         alert('Veuillez remplir tous les champs');
         return;
     }
 
-    const data = { nom, longueur, largeur, hauteur, is_default: false };
+    const data = { nom, longueur, largeur, hauteur, poids_carton, is_default: false };
 
     try {
         const url = id ? `${API_URL}/api/dimensions/${id}` : `${API_URL}/api/dimensions`;
@@ -1653,4 +1710,245 @@ function removeLogo() {
     document.getElementById('logoFileInput').value = '';
 
     alert('Logo supprimé');
+}
+
+// ============= GESTION DES PRODUITS DANS LE COLIS =============
+
+// Mettre à jour la liste déroulante des produits disponibles
+function updateProduitSelect() {
+    const select = document.getElementById('selectProduitToAdd');
+    if (!select) return;
+
+    select.innerHTML = '<option value="">Sélectionner un produit...</option>' +
+        produits.filter(p => p.stock > 0).map(p => {
+            const dim = dimensions.find(d => d.id === p.dimension_id);
+            const dimInfo = dim ? ` (${dim.nom})` : '';
+            return `<option value="${p.id}">${p.nom} - Stock: ${p.stock}${dimInfo}</option>`;
+        }).join('');
+}
+
+// Ajouter un produit à la sélection du colis
+function addProduitToColis() {
+    const select = document.getElementById('selectProduitToAdd');
+    const produitId = parseInt(select.value);
+
+    if (!produitId) {
+        alert('Veuillez sélectionner un produit');
+        return;
+    }
+
+    const produit = produits.find(p => p.id === produitId);
+    if (!produit) return;
+
+    // Vérifier si le produit est déjà dans la liste
+    const existing = colisProduitsSelection.find(p => p.produit_id === produitId);
+    if (existing) {
+        // Incrémenter la quantité si stock suffisant
+        if (existing.quantite < produit.stock) {
+            existing.quantite++;
+        } else {
+            alert('Stock insuffisant pour ce produit');
+            return;
+        }
+    } else {
+        // Ajouter le produit
+        colisProduitsSelection.push({
+            produit_id: produitId,
+            nom: produit.nom,
+            poids: produit.poids || 0,
+            dimension_id: produit.dimension_id,
+            stock: produit.stock,
+            quantite: 1,
+            lien: ''
+        });
+    }
+
+    displayColisProduitsSelection();
+    calculatePoidsAndDimension();
+    select.value = '';
+}
+
+// Afficher les produits sélectionnés
+function displayColisProduitsSelection() {
+    const container = document.getElementById('colisProduitsContainer');
+    if (!container) return;
+
+    if (colisProduitsSelection.length === 0) {
+        container.innerHTML = '<div class="colis-produits-empty">Aucun produit sélectionné</div>';
+        return;
+    }
+
+    container.innerHTML = colisProduitsSelection.map((p, index) => {
+        const stockInfo = p.quantite <= p.stock
+            ? `<span class="stock-ok">Stock OK (${p.stock})</span>`
+            : `<span class="stock-warning">Stock insuffisant!</span>`;
+
+        return `
+            <div class="colis-produit-item" data-index="${index}">
+                <div class="colis-produit-info">
+                    <div class="colis-produit-nom">${p.nom}</div>
+                    <div class="colis-produit-meta">
+                        ${p.poids ? p.poids + ' kg' : 'Poids non défini'} · ${stockInfo}
+                    </div>
+                </div>
+                <div class="colis-produit-lien">
+                    <input type="url" placeholder="https://..." value="${p.lien || ''}"
+                           onchange="updateProduitLien(${index}, this.value)">
+                </div>
+                <div class="colis-produit-quantite">
+                    <input type="number" min="1" max="${p.stock}" value="${p.quantite}"
+                           onchange="updateProduitQuantite(${index}, this.value)">
+                </div>
+                <button type="button" class="colis-produit-remove" onclick="removeProduitFromColis(${index})">✕</button>
+            </div>
+        `;
+    }).join('');
+}
+
+// Mettre à jour le lien d'un produit
+function updateProduitLien(index, lien) {
+    if (colisProduitsSelection[index]) {
+        colisProduitsSelection[index].lien = lien;
+    }
+}
+
+// Mettre à jour la quantité d'un produit
+function updateProduitQuantite(index, quantite) {
+    if (colisProduitsSelection[index]) {
+        const newQty = parseInt(quantite) || 1;
+        const maxStock = colisProduitsSelection[index].stock;
+        colisProduitsSelection[index].quantite = Math.min(newQty, maxStock);
+        displayColisProduitsSelection();
+        calculatePoidsAndDimension();
+    }
+}
+
+// Supprimer un produit de la sélection
+function removeProduitFromColis(index) {
+    colisProduitsSelection.splice(index, 1);
+    displayColisProduitsSelection();
+    calculatePoidsAndDimension();
+}
+
+// Calculer le poids total et sélectionner la bonne dimension
+function calculatePoidsAndDimension() {
+    if (colisProduitsSelection.length === 0) {
+        document.getElementById('colisPoids').value = '';
+        document.getElementById('colisDimensions').value = '';
+        document.getElementById('colisPoidsTotalInfo').style.display = 'none';
+        return;
+    }
+
+    // Trouver la plus grande dimension parmi les produits
+    let maxDimensionId = null;
+    let maxVolume = 0;
+
+    colisProduitsSelection.forEach(p => {
+        if (p.dimension_id) {
+            const dim = dimensions.find(d => d.id === p.dimension_id);
+            if (dim) {
+                const volume = dim.longueur * dim.largeur * dim.hauteur;
+                if (volume > maxVolume) {
+                    maxVolume = volume;
+                    maxDimensionId = p.dimension_id;
+                }
+            }
+        }
+    });
+
+    // Si on a trouvé une dimension, l'utiliser
+    let poidsCarton = 0;
+    if (maxDimensionId) {
+        const selectedDim = dimensions.find(d => d.id === maxDimensionId);
+        if (selectedDim) {
+            document.getElementById('colisDimensions').value = `${selectedDim.longueur}x${selectedDim.largeur}x${selectedDim.hauteur}cm`;
+            poidsCarton = selectedDim.poids_carton || 0;
+        }
+    }
+
+    // Calculer le poids total des produits
+    let poidsProduits = 0;
+    colisProduitsSelection.forEach(p => {
+        poidsProduits += (p.poids || 0) * p.quantite;
+    });
+
+    const poidsTotal = poidsProduits + poidsCarton;
+    document.getElementById('colisPoids').value = poidsTotal.toFixed(2);
+
+    // Afficher l'info du poids total
+    document.getElementById('colisPoidsTotalValue').textContent = poidsTotal.toFixed(2);
+    document.getElementById('colisPoidsTotalInfo').style.display = 'block';
+}
+
+// Sélection manuelle d'une dimension (boutons)
+function setDimension(dimension) {
+    document.getElementById('colisDimensions').value = dimension + 'cm';
+
+    // Recalculer le poids avec le poids du carton
+    const dimParts = dimension.split('x').map(parseFloat);
+    if (dimParts.length === 3) {
+        const matchingDim = dimensions.find(d =>
+            d.longueur === dimParts[0] && d.largeur === dimParts[1] && d.hauteur === dimParts[2]
+        );
+        if (matchingDim && colisProduitsSelection.length > 0) {
+            let poidsProduits = 0;
+            colisProduitsSelection.forEach(p => {
+                poidsProduits += (p.poids || 0) * p.quantite;
+            });
+            const poidsTotal = poidsProduits + (matchingDim.poids_carton || 0);
+            document.getElementById('colisPoids').value = poidsTotal.toFixed(2);
+            document.getElementById('colisPoidsTotalValue').textContent = poidsTotal.toFixed(2);
+            document.getElementById('colisPoidsTotalInfo').style.display = 'block';
+        }
+    }
+}
+
+// ============= MODAL PRODUITS DU COLIS =============
+
+// Afficher le modal avec les produits d'un colis
+function showColisProduitsModal(colisId) {
+    const c = colis.find(col => col.id === colisId);
+    if (!c || !c.produits || c.produits.length === 0) return;
+
+    const container = document.getElementById('colisProduitsListModal');
+    container.innerHTML = c.produits.map(p => {
+        const lienHtml = p.lien
+            ? `<div class="produit-modal-lien"><a href="${p.lien}" target="_blank">🔗 Ouvrir le lien</a></div>`
+            : '<div class="produit-modal-no-link">Pas de lien assigné</div>';
+
+        return `
+            <div class="produit-modal-item">
+                <div class="produit-modal-info">
+                    <div class="produit-modal-nom">${p.nom || 'Produit'}</div>
+                    <div class="produit-modal-quantite">Quantité: ${p.quantite || 1}</div>
+                </div>
+                ${lienHtml}
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('modalColisProduits').classList.add('active');
+}
+
+// Gérer le clic sur le produit dans la liste des colis
+function handleProduitClick(colisId) {
+    const c = colis.find(col => col.id === colisId);
+    if (!c) return;
+
+    // Si le colis a des produits via la relation colis_produits
+    if (c.produits && c.produits.length > 0) {
+        if (c.produits.length === 1 && c.produits[0].lien) {
+            // Un seul produit avec lien : ouvrir directement
+            window.open(c.produits[0].lien, '_blank');
+        } else {
+            // Plusieurs produits ou pas de lien : ouvrir le modal
+            showColisProduitsModal(colisId);
+        }
+    } else {
+        // Fallback sur l'ancien système (notes)
+        const notesData = parseNotesData(c.notes);
+        if (notesData.lien) {
+            window.open(notesData.lien, '_blank');
+        }
+    }
 }
