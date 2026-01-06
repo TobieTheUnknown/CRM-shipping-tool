@@ -67,15 +67,16 @@ async function loadClients() {
     }
 }
 
-function displayClients() {
+function displayClients(filteredList = null) {
     const tbody = document.getElementById('clientsTableBody');
+    const listToDisplay = filteredList || clients;
 
-    if (clients.length === 0) {
+    if (listToDisplay.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="empty">Aucun client</td></tr>';
         return;
     }
 
-    tbody.innerHTML = clients.map(client => `
+    tbody.innerHTML = listToDisplay.map(client => `
         <tr>
             <td>${client.nom}</td>
             <td>${client.prenom || ''}</td>
@@ -88,6 +89,22 @@ function displayClients() {
             </td>
         </tr>
     `).join('');
+}
+
+function filterClients() {
+    const searchTerm = document.getElementById('searchClients').value.toLowerCase().trim();
+
+    if (!searchTerm) {
+        displayClients();
+        return;
+    }
+
+    const filtered = clients.filter(client => {
+        const searchStr = `${client.nom} ${client.prenom || ''} ${client.email || ''} ${client.telephone || ''} ${client.ville || ''}`.toLowerCase();
+        return searchStr.includes(searchTerm);
+    });
+
+    displayClients(filtered);
 }
 
 function updateClientSelect() {
@@ -655,15 +672,16 @@ async function loadProduits() {
     }
 }
 
-function displayProduits() {
+function displayProduits(filteredList = null) {
     const tbody = document.getElementById('produitsTableBody');
+    const listToDisplay = filteredList || produits;
 
-    if (produits.length === 0) {
+    if (listToDisplay.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="empty">Aucun produit</td></tr>';
         return;
     }
 
-    tbody.innerHTML = produits.map(produit => `
+    tbody.innerHTML = listToDisplay.map(produit => `
         <tr>
             <td>${produit.nom}</td>
             <td>${produit.description || ''}</td>
@@ -676,6 +694,22 @@ function displayProduits() {
             </td>
         </tr>
     `).join('');
+}
+
+function filterProduits() {
+    const searchTerm = document.getElementById('searchProduits').value.toLowerCase().trim();
+
+    if (!searchTerm) {
+        displayProduits();
+        return;
+    }
+
+    const filtered = produits.filter(produit => {
+        const searchStr = `${produit.nom} ${produit.description || ''}`.toLowerCase();
+        return searchStr.includes(searchTerm);
+    });
+
+    displayProduits(filtered);
 }
 
 function showAddProduitModal() {
@@ -1714,29 +1748,55 @@ function removeLogo() {
 
 // ============= GESTION DES PRODUITS DANS LE COLIS =============
 
-// Mettre à jour la liste déroulante des produits disponibles
-function updateProduitSelect() {
-    const select = document.getElementById('selectProduitToAdd');
-    if (!select) return;
+// Filtrer et afficher les produits pour la recherche dans le modal colis
+function filterProduitsForColis() {
+    const searchInput = document.getElementById('searchProduitsColis');
+    const resultsContainer = document.getElementById('produitSearchResults');
+    const searchTerm = searchInput.value.toLowerCase().trim();
 
-    select.innerHTML = '<option value="">Sélectionner un produit...</option>' +
-        produits.filter(p => p.stock > 0).map(p => {
-            const dim = dimensions.find(d => d.id === p.dimension_id);
-            const dimInfo = dim ? ` (${dim.nom})` : '';
-            return `<option value="${p.id}">${p.nom} - Stock: ${p.stock}${dimInfo}</option>`;
-        }).join('');
-}
-
-// Ajouter un produit à la sélection du colis
-function addProduitToColis() {
-    const select = document.getElementById('selectProduitToAdd');
-    const produitId = parseInt(select.value);
-
-    if (!produitId) {
-        alert('Veuillez sélectionner un produit');
+    if (!searchTerm) {
+        resultsContainer.style.display = 'none';
         return;
     }
 
+    // Filtrer les produits avec stock > 0 et qui ne sont pas déjà sélectionnés
+    const selectedIds = colisProduitsSelection.map(p => p.produit_id);
+    const filtered = produits.filter(p => {
+        if (p.stock <= 0) return false;
+        const searchStr = `${p.nom} ${p.description || ''}`.toLowerCase();
+        return searchStr.includes(searchTerm);
+    });
+
+    if (filtered.length === 0) {
+        resultsContainer.innerHTML = '<div class="produit-search-empty">Aucun produit trouvé</div>';
+        resultsContainer.style.display = 'block';
+        return;
+    }
+
+    resultsContainer.innerHTML = filtered.map(p => {
+        const dim = dimensions.find(d => d.id === p.dimension_id);
+        const dimInfo = dim ? dim.nom : '';
+        const stockClass = p.stock > 5 ? 'in-stock' : (p.stock > 0 ? 'low-stock' : 'no-stock');
+        const alreadySelected = selectedIds.includes(p.id);
+
+        return `
+            <div class="produit-search-item ${alreadySelected ? 'already-selected' : ''}" onclick="addProduitFromSearch(${p.id})">
+                <div class="produit-search-item-info">
+                    <div class="produit-search-item-name">${p.nom}</div>
+                    <div class="produit-search-item-meta">
+                        ${p.poids ? p.poids + ' kg' : ''} ${dimInfo ? '· ' + dimInfo : ''} ${p.prix ? '· ' + p.prix.toFixed(2) + '€' : ''}
+                    </div>
+                </div>
+                <span class="produit-search-item-stock ${stockClass}">${alreadySelected ? '✓ Ajouté' : 'Stock: ' + p.stock}</span>
+            </div>
+        `;
+    }).join('');
+
+    resultsContainer.style.display = 'block';
+}
+
+// Ajouter un produit depuis la recherche
+function addProduitFromSearch(produitId) {
     const produit = produits.find(p => p.id === produitId);
     if (!produit) return;
 
@@ -1756,6 +1816,8 @@ function addProduitToColis() {
             produit_id: produitId,
             nom: produit.nom,
             poids: produit.poids || 0,
+            prix: produit.prix || 0,
+            description: produit.description || '',
             dimension_id: produit.dimension_id,
             stock: produit.stock,
             quantite: 1,
@@ -1765,7 +1827,24 @@ function addProduitToColis() {
 
     displayColisProduitsSelection();
     calculatePoidsAndDimension();
-    select.value = '';
+
+    // Vider et cacher la recherche
+    document.getElementById('searchProduitsColis').value = '';
+    document.getElementById('produitSearchResults').style.display = 'none';
+}
+
+// Fermer les résultats de recherche quand on clique ailleurs
+document.addEventListener('click', function(e) {
+    const searchContainer = document.querySelector('.produit-search-container');
+    const resultsContainer = document.getElementById('produitSearchResults');
+    if (searchContainer && resultsContainer && !searchContainer.contains(e.target)) {
+        resultsContainer.style.display = 'none';
+    }
+});
+
+// Ancienne fonction conservée pour compatibilité
+function updateProduitSelect() {
+    // Cette fonction n'est plus utilisée mais conservée pour la compatibilité
 }
 
 // Afficher les produits sélectionnés
@@ -1905,22 +1984,69 @@ function setDimension(dimension) {
 
 // ============= MODAL PRODUITS DU COLIS =============
 
-// Afficher le modal avec les produits d'un colis
+// Afficher le modal avec les produits d'un colis (avec fiche détaillée)
 function showColisProduitsModal(colisId) {
     const c = colis.find(col => col.id === colisId);
-    if (!c || !c.produits || c.produits.length === 0) return;
+    if (!c) return;
 
     const container = document.getElementById('colisProduitsListModal');
+
+    // Gérer le cas où il n'y a pas de produits
+    if (!c.produits || c.produits.length === 0) {
+        // Fallback sur l'ancien système (notes)
+        const notesData = parseNotesData(c.notes);
+        if (notesData.item) {
+            container.innerHTML = `
+                <div class="produit-modal-item">
+                    <div class="produit-modal-info">
+                        <div class="produit-modal-nom">${notesData.item}</div>
+                        <div class="produit-modal-quantite">Quantité: 1</div>
+                    </div>
+                    ${notesData.lien
+                        ? `<div class="produit-modal-lien"><a href="${notesData.lien}" target="_blank">🔗 Ouvrir le lien</a></div>`
+                        : '<div class="produit-modal-no-link">Pas de lien assigné</div>'}
+                </div>
+            `;
+        } else {
+            container.innerHTML = '<div class="produit-search-empty">Aucun produit dans ce colis</div>';
+        }
+        document.getElementById('modalColisProduits').classList.add('active');
+        return;
+    }
+
     container.innerHTML = c.produits.map(p => {
+        // Récupérer les infos complètes du produit depuis le catalogue
+        const produitComplet = produits.find(pr => pr.id === p.produit_id) || {};
+
         const lienHtml = p.lien
             ? `<div class="produit-modal-lien"><a href="${p.lien}" target="_blank">🔗 Ouvrir le lien</a></div>`
             : '<div class="produit-modal-no-link">Pas de lien assigné</div>';
 
+        // Fiche détaillée du produit
+        const detailsHtml = `
+            <div class="produit-modal-detail">
+                <div class="produit-modal-detail-item">
+                    <span class="produit-modal-detail-label">Poids:</span>
+                    <span class="produit-modal-detail-value">${p.poids || produitComplet.poids || '-'} kg</span>
+                </div>
+                <div class="produit-modal-detail-item">
+                    <span class="produit-modal-detail-label">Prix:</span>
+                    <span class="produit-modal-detail-value">${produitComplet.prix ? produitComplet.prix.toFixed(2) + ' €' : '-'}</span>
+                </div>
+                ${produitComplet.description ? `
+                <div class="produit-modal-detail-item" style="grid-column: span 2;">
+                    <span class="produit-modal-detail-label">Description:</span>
+                    <span class="produit-modal-detail-value">${produitComplet.description}</span>
+                </div>` : ''}
+            </div>
+        `;
+
         return `
             <div class="produit-modal-item">
-                <div class="produit-modal-info">
+                <div class="produit-modal-info" style="flex: 1;">
                     <div class="produit-modal-nom">${p.nom || 'Produit'}</div>
                     <div class="produit-modal-quantite">Quantité: ${p.quantite || 1}</div>
+                    ${detailsHtml}
                 </div>
                 ${lienHtml}
             </div>
@@ -1931,24 +2057,11 @@ function showColisProduitsModal(colisId) {
 }
 
 // Gérer le clic sur le produit dans la liste des colis
+// TOUJOURS ouvrir le modal (même avec un seul produit)
 function handleProduitClick(colisId) {
     const c = colis.find(col => col.id === colisId);
     if (!c) return;
 
-    // Si le colis a des produits via la relation colis_produits
-    if (c.produits && c.produits.length > 0) {
-        if (c.produits.length === 1 && c.produits[0].lien) {
-            // Un seul produit avec lien : ouvrir directement
-            window.open(c.produits[0].lien, '_blank');
-        } else {
-            // Plusieurs produits ou pas de lien : ouvrir le modal
-            showColisProduitsModal(colisId);
-        }
-    } else {
-        // Fallback sur l'ancien système (notes)
-        const notesData = parseNotesData(c.notes);
-        if (notesData.lien) {
-            window.open(notesData.lien, '_blank');
-        }
-    }
+    // Toujours ouvrir le modal pour afficher les détails
+    showColisProduitsModal(colisId);
 }
