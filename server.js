@@ -11,12 +11,16 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Chemin des données (partagé avec database.js)
+const dataPath = db.dataPath || __dirname;
+const uploadsPath = path.join(dataPath, 'uploads');
+
 // Configuration Multer pour l'upload de fichiers
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ dest: uploadsPath });
 
 // Créer le dossier uploads s'il n'existe pas
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
 }
 
 // Middleware
@@ -665,7 +669,7 @@ app.get('/api/stats', (req, res) => {
 // ============= EXPORT / RESET DATABASE =============
 
 app.get('/api/database/export', (req, res) => {
-  const dbPath = path.join(__dirname, 'crm.db');
+  const dbPath = path.join(dataPath, 'crm.db');
 
   if (!fs.existsSync(dbPath)) {
     return res.status(404).json({ error: 'Base de données non trouvée' });
@@ -685,7 +689,7 @@ app.post('/api/database/import', upload.single('dbFile'), (req, res) => {
   }
 
   const uploadedPath = req.file.path;
-  const dbPath = path.join(__dirname, 'crm.db');
+  const dbPath = path.join(dataPath, 'crm.db');
 
   try {
     // Fermer la connexion actuelle
