@@ -278,16 +278,25 @@ app.get('/api/colis', (req, res) => {
       ORDER BY c.date_creation DESC
     `).all();
 
-    // Récupérer les produits pour chaque colis
-    const stmtProduits = db.prepare(`
-      SELECT cp.*, p.nom, p.poids, p.dimension_id
+    // Récupérer TOUS les produits de TOUS les colis en UNE SEULE requête (fix N+1)
+    const allProduits = db.prepare(`
+      SELECT cp.colis_id, cp.produit_id, cp.quantite, p.nom, p.poids, p.dimension_id
       FROM colis_produits cp
       LEFT JOIN produits p ON cp.produit_id = p.id
-      WHERE cp.colis_id = ?
-    `);
+    `).all();
 
+    // Grouper les produits par colis_id
+    const produitsParColis = {};
+    allProduits.forEach(p => {
+      if (!produitsParColis[p.colis_id]) {
+        produitsParColis[p.colis_id] = [];
+      }
+      produitsParColis[p.colis_id].push(p);
+    });
+
+    // Assigner les produits à chaque colis
     rows.forEach(colis => {
-      colis.produits = stmtProduits.all(colis.id);
+      colis.produits = produitsParColis[colis.id] || [];
     });
 
     res.json(rows);

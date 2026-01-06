@@ -10,17 +10,61 @@ let selectedColis = new Set();
 let colisProduitsSelection = []; // Produits sélectionnés pour le colis en cours
 let selectedTimbreId = null; // Timbre sélectionné pour le colis en cours
 
+// ============= TOAST NOTIFICATIONS =============
+
+function showToast(message, type = 'success', title = null, duration = 3000) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const icons = {
+        success: '✓',
+        error: '✗',
+        warning: '⚠',
+        info: 'ℹ'
+    };
+
+    const titles = {
+        success: title || 'Succès',
+        error: title || 'Erreur',
+        warning: title || 'Attention',
+        info: title || 'Information'
+    };
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || icons.info}</div>
+        <div class="toast-content">
+            <div class="toast-title">${titles[type]}</div>
+            <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+    `;
+
+    container.appendChild(toast);
+
+    if (duration > 0) {
+        setTimeout(() => {
+            toast.classList.add('hiding');
+            setTimeout(() => toast.remove(), 200);
+        }, duration);
+    }
+}
+
 // ============= INITIALISATION =============
 
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
-    loadStats();
-    loadClients();
-    loadProduits();
-    loadColis();
-    loadDimensions();
-    loadTimbres();
-    loadTimbreCategories();
+    // Charger toutes les données en parallèle pour un démarrage plus rapide
+    Promise.all([
+        loadStats(),
+        loadClients(),
+        loadProduits(),
+        loadColis(),
+        loadDimensions(),
+        loadTimbres(),
+        loadTimbreCategories()
+    ]);
 });
 
 function initTabs() {
@@ -218,13 +262,12 @@ async function saveClient(event) {
 
         if (response.ok) {
             closeModal('modalClient');
-            loadClients();
-            loadStats();
-            alert('Client enregistré avec succès!');
+            await Promise.all([loadClients(), loadStats()]);
+            showToast('Client enregistré avec succès!');
         }
     } catch (error) {
         console.error('Erreur sauvegarde client:', error);
-        alert('Erreur lors de la sauvegarde');
+        showToast('Erreur lors de la sauvegarde', 'error');
     }
 }
 
@@ -234,9 +277,8 @@ async function deleteClient(id) {
     try {
         const response = await fetch(`${API_URL}/api/clients/${id}`, { method: 'DELETE' });
         if (response.ok) {
-            loadClients();
-            loadStats();
-            alert('Client supprimé');
+            await Promise.all([loadClients(), loadStats()]);
+            showToast('Client supprimé');
         }
     } catch (error) {
         console.error('Erreur suppression client:', error);
@@ -249,7 +291,7 @@ async function viewClientDetails(clientId) {
         const client = await response.json();
 
         if (!client) {
-            alert('Client introuvable');
+            showToast('Client introuvable', 'error');
             return;
         }
 
@@ -323,7 +365,7 @@ async function viewClientDetails(clientId) {
         document.getElementById('modalClientDetails').classList.add('active');
     } catch (error) {
         console.error('Erreur chargement détails client:', error);
-        alert('Erreur lors du chargement des détails');
+        showToast('Erreur lors du chargement des détails', 'error');
     }
 }
 
@@ -349,7 +391,7 @@ function parseQuickClient() {
     const input = document.getElementById('quickClientInput').value.trim();
 
     if (!input) {
-        alert('Veuillez entrer des informations');
+        showToast('Veuillez entrer des informations', 'warning');
         return;
     }
 
@@ -515,7 +557,7 @@ function smartParseClientInfo(text) {
 
 async function confirmQuickClient() {
     if (!parsedClientData) {
-        alert('Veuillez d\'abord analyser les informations');
+        showToast('Veuillez d\'abord analyser les informations', 'warning');
         return;
     }
 
@@ -550,13 +592,13 @@ async function confirmQuickClient() {
             fillClientAddress();
 
             closeModal('modalQuickClient');
-            alert('Client créé avec succès!');
+            showToast('Client créé avec succès!');
         } else {
-            alert('Erreur lors de la création du client');
+            showToast('Erreur lors de la création du client', 'error');
         }
     } catch (error) {
         console.error('Erreur création client:', error);
-        alert('Erreur lors de la création du client');
+        showToast('Erreur lors de la création du client', 'error');
     }
 }
 
@@ -573,7 +615,7 @@ function parseAndFillClientForm() {
     const input = document.getElementById('quickFillClientInput').value.trim();
 
     if (!input) {
-        alert('Veuillez entrer des informations');
+        showToast('Veuillez entrer des informations', 'warning');
         return;
     }
 
@@ -594,7 +636,7 @@ function parseAndFillClientForm() {
     document.getElementById('quickFillClientInput').value = '';
     document.getElementById('quickFillClientSection').style.display = 'none';
 
-    alert('✅ Champs remplis automatiquement ! Vérifiez et complétez si nécessaire.');
+    showToast('Champs remplis automatiquement ! Vérifiez et complétez si nécessaire.', 'info');
 }
 
 // ============= GESTION WALLETS/LIENS MULTIPLES =============
@@ -765,13 +807,12 @@ async function saveProduit(event) {
 
         if (response.ok) {
             closeModal('modalProduit');
-            loadProduits();
-            loadStats();
-            alert('Produit enregistré avec succès!');
+            await Promise.all([loadProduits(), loadStats()]);
+            showToast('Produit enregistré avec succès!');
         }
     } catch (error) {
         console.error('Erreur sauvegarde produit:', error);
-        alert('Erreur lors de la sauvegarde');
+        showToast('Erreur lors de la sauvegarde', 'error');
     }
 }
 
@@ -781,9 +822,8 @@ async function deleteProduit(id) {
     try {
         const response = await fetch(`${API_URL}/api/produits/${id}`, { method: 'DELETE' });
         if (response.ok) {
-            loadProduits();
-            loadStats();
-            alert('Produit supprimé');
+            await Promise.all([loadProduits(), loadStats()]);
+            showToast('Produit supprimé');
         }
     } catch (error) {
         console.error('Erreur suppression produit:', error);
@@ -1070,27 +1110,24 @@ async function saveColis(event) {
             }
 
             closeModal('modalColis');
-            loadColis();
-            loadProduits(); // Recharger les produits pour mettre à jour le stock
-            loadTimbres(); // Recharger les timbres pour mettre à jour les statuts
-            loadStats();
+            // Paralléliser les rechargements pour une meilleure performance
+            await Promise.all([loadColis(), loadProduits(), loadTimbres(), loadStats()]);
 
             // Vérifier si des produits sont en stock négatif
             if (result.produitsNegatifs && result.produitsNegatifs.length > 0) {
-                let message = 'Colis enregistré avec succès!\n\n';
-                message += '⚠️ ATTENTION - Stocks négatifs:\n\n';
+                let message = '⚠️ Stocks négatifs:\n\n';
                 result.produitsNegatifs.forEach(p => {
                     const quantiteManquante = Math.abs(p.stock);
                     message += `A demander a Martin: Je suis a court de ${p.nom} je dois en envoyer ${quantiteManquante} si tu peux me rajouter ça sur une commande 🙏\n\n`;
                 });
-                alert(message);
+                showToast(message, 'warning', 'Colis enregistré avec stocks négatifs', 6000);
             } else {
-                alert('Colis enregistré avec succès!');
+                showToast('Colis enregistré avec succès!');
             }
         }
     } catch (error) {
         console.error('Erreur sauvegarde colis:', error);
-        alert('Erreur lors de la sauvegarde');
+        showToast('Erreur lors de la sauvegarde', 'error');
     }
 }
 
@@ -1100,9 +1137,8 @@ async function deleteColis(id) {
     try {
         const response = await fetch(`${API_URL}/api/colis/${id}`, { method: 'DELETE' });
         if (response.ok) {
-            loadColis();
-            loadStats();
-            alert('Colis supprimé');
+            await Promise.all([loadColis(), loadStats()]);
+            showToast('Colis supprimé');
         }
     } catch (error) {
         console.error('Erreur suppression colis:', error);
@@ -1181,7 +1217,7 @@ function validateColisForLabel(colisData) {
 
 async function imprimerEtiquettesSelection() {
     if (selectedColis.size === 0) {
-        alert('Veuillez sélectionner au moins un colis');
+        showToast('Veuillez sélectionner au moins un colis', 'warning');
         return;
     }
 
@@ -1211,7 +1247,7 @@ async function imprimerEtiquettesSelection() {
             message += '\n';
         });
         message += 'Veuillez compléter ces informations avant de réessayer.';
-        alert(message);
+        showToast(message, 'error', 'Informations manquantes', 8000);
         return;
     }
 
@@ -1249,11 +1285,11 @@ async function imprimerEtiquettesSelection() {
                 await marquerColisExpedies(Array.from(selectedColis));
             }
         } else {
-            alert('Erreur lors de la génération du PDF');
+            showToast('Erreur lors de la génération du PDF', 'error');
         }
     } catch (error) {
         console.error('Erreur impression étiquettes:', error);
-        alert('Erreur lors de l\'impression');
+        showToast('Erreur lors de l\'impression', 'error');
     }
 }
 
@@ -1291,16 +1327,15 @@ async function marquerColisExpedies(colisIds) {
             });
         }
 
-        // Recharger la liste des colis et les stats
-        await loadColis();
-        await loadStats();
+        // Recharger la liste des colis et les stats en parallèle
+        await Promise.all([loadColis(), loadStats()]);
 
         // Désélectionner tous les colis
         selectedColis.clear();
         updateSelection();
     } catch (error) {
         console.error('Erreur lors de la mise à jour des statuts:', error);
-        alert('Erreur lors de la mise à jour du statut des colis');
+        showToast('Erreur lors de la mise à jour du statut des colis', 'error');
     }
 }
 
@@ -1338,7 +1373,7 @@ async function uploadCSV(event) {
     const file = fileInput.files[0];
 
     if (!file) {
-        alert('Veuillez sélectionner un fichier CSV');
+        showToast('Veuillez sélectionner un fichier CSV', 'warning');
         return;
     }
 
@@ -1379,10 +1414,8 @@ async function uploadCSV(event) {
             `;
             resultDiv.style.display = 'block';
 
-            // Rafraîchir les données
-            loadStats();
-            loadClients();
-            loadColis();
+            // Rafraîchir les données en parallèle
+            Promise.all([loadStats(), loadClients(), loadColis()]);
 
             // Réinitialiser le formulaire
             document.getElementById('csvUploadForm').reset();
@@ -1453,12 +1486,9 @@ async function initTestData() {
             `;
             resultDiv.style.display = 'block';
 
-            // Rafraîchir les données
+            // Rafraîchir les données en parallèle
             setTimeout(() => {
-                loadStats();
-                loadClients();
-                loadProduits();
-                loadColis();
+                Promise.all([loadStats(), loadClients(), loadProduits(), loadColis()]);
             }, 500);
         } else {
             contentDiv.innerHTML = `
@@ -1469,7 +1499,7 @@ async function initTestData() {
         }
     } catch (error) {
         console.error('Erreur init données test:', error);
-        alert('Erreur lors du chargement des données de test');
+        showToast('Erreur lors du chargement des données de test', 'error');
     }
 }
 
@@ -1571,12 +1601,9 @@ async function resetDatabase() {
             `;
             resultDiv.style.display = 'block';
 
-            // Rafraîchir les données
+            // Rafraîchir les données en parallèle
             setTimeout(() => {
-                loadStats();
-                loadClients();
-                loadProduits();
-                loadColis();
+                Promise.all([loadStats(), loadClients(), loadProduits(), loadColis()]);
             }, 500);
         } else {
             contentDiv.innerHTML = `
@@ -1587,7 +1614,7 @@ async function resetDatabase() {
         }
     } catch (error) {
         console.error('Erreur reset base de données:', error);
-        alert('Erreur lors de la réinitialisation');
+        showToast('Erreur lors de la réinitialisation', 'error');
     }
 }
 
@@ -1699,7 +1726,7 @@ async function saveDimension() {
     const poids_carton = parseFloat(document.getElementById('dimensionPoidsCarton').value) || 0;
 
     if (!nom || !longueur || !largeur || !hauteur) {
-        alert('Veuillez remplir tous les champs');
+        showToast('Veuillez remplir tous les champs', 'warning');
         return;
     }
 
@@ -1718,13 +1745,13 @@ async function saveDimension() {
         if (response.ok) {
             cancelDimensionEdit();
             loadDimensions();
-            alert(id ? 'Dimension modifiée!' : 'Dimension créée!');
+            showToast(id ? 'Dimension modifiée!' : 'Dimension créée!');
         } else {
-            alert('Erreur lors de la sauvegarde');
+            showToast('Erreur lors de la sauvegarde', 'error');
         }
     } catch (error) {
         console.error('Erreur sauvegarde dimension:', error);
-        alert('Erreur lors de la sauvegarde');
+        showToast('Erreur lors de la sauvegarde', 'error');
     }
 }
 
@@ -1735,7 +1762,7 @@ async function deleteDimension(id) {
         const response = await fetch(`${API_URL}/api/dimensions/${id}`, { method: 'DELETE' });
         if (response.ok) {
             loadDimensions();
-            alert('Dimension supprimée');
+            showToast('Dimension supprimée');
         }
     } catch (error) {
         console.error('Erreur suppression dimension:', error);
@@ -1767,13 +1794,13 @@ function uploadLogo() {
 
     // Vérifier le type de fichier
     if (!file.type.match('image/(png|jpeg|jpg)')) {
-        alert('Format de fichier non supporté. Utilisez PNG, JPG ou JPEG.');
+        showToast('Format de fichier non supporté. Utilisez PNG, JPG ou JPEG.', 'error');
         return;
     }
 
     // Vérifier la taille (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-        alert('Le fichier est trop volumineux. Taille maximum: 2MB');
+        showToast('Le fichier est trop volumineux. Taille maximum: 2MB', 'error');
         return;
     }
 
@@ -1790,7 +1817,7 @@ function uploadLogo() {
         document.getElementById('logoPlaceholder').style.display = 'none';
         document.getElementById('btnRemoveLogo').style.display = 'inline-block';
 
-        alert('Logo uploadé avec succès!');
+        showToast('Logo uploadé avec succès!');
     };
 
     reader.readAsDataURL(file);
@@ -1806,7 +1833,7 @@ function removeLogo() {
     document.getElementById('btnRemoveLogo').style.display = 'none';
     document.getElementById('logoFileInput').value = '';
 
-    alert('Logo supprimé');
+    showToast('Logo supprimé');
 }
 
 // ============= GESTION DES PRODUITS DANS LE COLIS =============
@@ -2322,9 +2349,8 @@ async function deleteAllTimbresCategorie(categorie) {
         const response = await fetch(`${API_URL}/api/timbres/categorie/${encodeURIComponent(categorie)}`, { method: 'DELETE' });
         if (response.ok) {
             const result = await response.json();
-            alert(`${result.changes} timbre(s) supprimé(s)`);
-            loadTimbres();
-            loadStats();
+            showToast(`${result.changes} timbre(s) supprimé(s)`);
+            await Promise.all([loadTimbres(), loadStats()]);
         }
     } catch (error) {
         console.error('Erreur suppression timbres:', error);
@@ -2354,8 +2380,7 @@ async function toggleTimbreStatut(id) {
     try {
         const response = await fetch(`${API_URL}/api/timbres/${id}/toggle`, { method: 'PUT' });
         if (response.ok) {
-            loadTimbres();
-            loadStats();
+            await Promise.all([loadTimbres(), loadStats()]);
         }
     } catch (error) {
         console.error('Erreur toggle timbre:', error);
@@ -2383,7 +2408,7 @@ async function importTimbres() {
     const numeros = Array.from(numerosSet);
 
     if (numeros.length === 0) {
-        alert('Aucun numéro de suivi trouvé dans le texte. Format attendu: "SD: XXXXX"');
+        showToast('Aucun numéro de suivi trouvé dans le texte. Format attendu: "SD: XXXXX"', 'warning');
         return;
     }
 
@@ -2396,16 +2421,15 @@ async function importTimbres() {
 
         const result = await response.json();
         if (response.ok) {
-            alert(`${result.inserted} timbre(s) importé(s) sur ${result.total} trouvé(s)`);
+            showToast(`${result.inserted} timbre(s) importé(s) sur ${result.total} trouvé(s)`);
             document.getElementById('timbresImportText').value = '';
-            loadTimbres();
-            loadStats();
+            await Promise.all([loadTimbres(), loadStats()]);
         } else {
-            alert('Erreur: ' + result.error);
+            showToast('Erreur: ' + result.error, 'error');
         }
     } catch (error) {
         console.error('Erreur import timbres:', error);
-        alert('Erreur lors de l\'import');
+        showToast('Erreur lors de l\'import', 'error');
     }
 }
 
@@ -2415,8 +2439,7 @@ async function deleteTimbre(id) {
     try {
         const response = await fetch(`${API_URL}/api/timbres/${id}`, { method: 'DELETE' });
         if (response.ok) {
-            loadTimbres();
-            loadStats();
+            await Promise.all([loadTimbres(), loadStats()]);
         }
     } catch (error) {
         console.error('Erreur suppression timbre:', error);
@@ -2429,8 +2452,7 @@ async function libererTimbre(id) {
     try {
         const response = await fetch(`${API_URL}/api/timbres/${id}/liberer`, { method: 'PUT' });
         if (response.ok) {
-            loadTimbres();
-            loadStats();
+            await Promise.all([loadTimbres(), loadStats()]);
         }
     } catch (error) {
         console.error('Erreur libération timbre:', error);
@@ -2514,6 +2536,7 @@ function updateTimbreSelect() {
         option.value = t.id;
         option.textContent = t.numero_suivi;
         option.dataset.numero = t.numero_suivi;
+        option.dataset.poidsMax = t.poids_max; // Stocker le poids max pour auto-remplissage
         select.appendChild(option);
     });
 }
@@ -2537,6 +2560,12 @@ function selectTimbreFromDropdown() {
     document.getElementById('colisNumeroSuivi').value = selectedOption.dataset.numero;
     document.getElementById('timbreInfo').textContent = '(timbre sélectionné)';
     document.getElementById('timbreInfo').style.color = 'var(--accent-green)';
+
+    // Auto-remplir le poids avec le poids max du timbre sélectionné
+    if (selectedOption.dataset.poidsMax) {
+        document.getElementById('colisPoids').value = selectedOption.dataset.poidsMax;
+    }
+
     updateLienSuiviPreview();
 }
 
@@ -2677,7 +2706,7 @@ async function saveTimbreCategorie() {
     };
 
     if (!data.nom) {
-        alert('Veuillez entrer un nom pour la catégorie');
+        showToast('Veuillez entrer un nom pour la catégorie', 'warning');
         return;
     }
 
@@ -2696,11 +2725,11 @@ async function saveTimbreCategorie() {
             loadTimbreCategories();
         } else {
             const error = await response.json();
-            alert('Erreur: ' + error.error);
+            showToast('Erreur: ' + error.error, 'error');
         }
     } catch (error) {
         console.error('Erreur sauvegarde catégorie:', error);
-        alert('Erreur lors de la sauvegarde');
+        showToast('Erreur lors de la sauvegarde', 'error');
     }
 }
 
@@ -2727,7 +2756,7 @@ async function deleteTimbreCategorie(id) {
             loadTimbreCategories();
         } else {
             const error = await response.json();
-            alert('Erreur: ' + error.error);
+            showToast('Erreur: ' + error.error, 'error');
         }
     } catch (error) {
         console.error('Erreur suppression catégorie:', error);
@@ -2821,10 +2850,10 @@ async function saveEditTimbre(event) {
             loadTimbres();
         } else {
             const error = await response.json();
-            alert('Erreur: ' + error.error);
+            showToast('Erreur: ' + error.error, 'error');
         }
     } catch (error) {
         console.error('Erreur édition timbre:', error);
-        alert('Erreur lors de la sauvegarde');
+        showToast('Erreur lors de la sauvegarde', 'error');
     }
 }
