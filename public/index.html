@@ -129,6 +129,53 @@
                     </div>
                 </div>
 
+                <!-- GESTION DES CATÉGORIES DE TIMBRES -->
+                <div class="database-tools">
+                    <h3>🎫 Catégories de timbres</h3>
+                    <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                        Gérez les types de timbres disponibles (national, international, etc.)
+                    </p>
+
+                    <div class="dimensions-list" id="timbreCategoriesList">
+                        <!-- Liste des catégories générée dynamiquement -->
+                    </div>
+
+                    <div class="dimension-form" id="timbreCategorieForm">
+                        <h4 id="timbreCategorieFormTitle">Ajouter une catégorie</h4>
+                        <input type="hidden" id="timbreCategorieId">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nom</label>
+                                <input type="text" id="timbreCategorieNom" placeholder="Ex: International 100g">
+                            </div>
+                            <div class="form-group">
+                                <label>Type</label>
+                                <select id="timbreCategorieType">
+                                    <option value="national">National</option>
+                                    <option value="international">International</option>
+                                    <option value="autre">Autre</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Poids min (g)</label>
+                                <input type="number" id="timbreCategoriePoidsMin" step="1" min="0" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Poids max (g)</label>
+                                <input type="number" id="timbreCategoriePoidsMax" step="1" min="0" placeholder="100">
+                            </div>
+                        </div>
+                        <div class="tools-buttons" style="margin-top: 15px;">
+                            <button class="btn btn-primary" onclick="saveTimbreCategorie()">
+                                💾 Enregistrer
+                            </button>
+                            <button class="btn btn-secondary" onclick="cancelTimbreCategorieEdit()" id="btnCancelTimbreCategorie" style="display: none;">
+                                Annuler
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- IMPORT CSV -->
                 <div class="database-tools">
                     <h3>📋 Import CSV</h3>
@@ -700,6 +747,31 @@
             <div class="form-actions">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('modalColisProduits')">Fermer</button>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL ÉDITION TIMBRE -->
+    <div id="modalEditTimbre" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('modalEditTimbre')">&times;</span>
+            <h2>Éditer le timbre</h2>
+            <form id="formEditTimbre" onsubmit="saveEditTimbre(event)">
+                <input type="hidden" id="editTimbreId">
+                <div class="form-group">
+                    <label>N° de Suivi</label>
+                    <input type="text" id="editTimbreNumero" required>
+                </div>
+                <div class="form-group">
+                    <label>Catégorie</label>
+                    <select id="editTimbreCategorie" required onchange="updateEditTimbrePoidsRange()">
+                        <!-- Options générées dynamiquement -->
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modalEditTimbre')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
         </div>
     </div>
 

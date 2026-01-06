@@ -869,6 +869,82 @@ app.delete('/api/timbres/categorie/:categorie', (req, res) => {
   }
 });
 
+// Update a single stamp
+app.put('/api/timbres/:id', (req, res) => {
+  const { numero_suivi, poids_categorie, poids_min, poids_max } = req.body;
+
+  try {
+    const result = db.prepare(
+      `UPDATE timbres SET numero_suivi = ?, poids_categorie = ?, poids_min = ?, poids_max = ? WHERE id = ?`
+    ).run(numero_suivi, poids_categorie, poids_min, poids_max, req.params.id);
+
+    res.json({ message: 'Timbre mis à jour', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============= ROUTES CATÉGORIES DE TIMBRES =============
+
+// Get all stamp categories
+app.get('/api/timbre-categories', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM timbre_categories ORDER BY type, poids_min ASC').all();
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create a new stamp category
+app.post('/api/timbre-categories', (req, res) => {
+  const { nom, poids_min, poids_max, type } = req.body;
+
+  try {
+    const result = db.prepare(
+      `INSERT INTO timbre_categories (nom, poids_min, poids_max, type) VALUES (?, ?, ?, ?)`
+    ).run(nom, poids_min, poids_max, type || 'national');
+
+    res.json({ id: result.lastInsertRowid, message: 'Catégorie créée avec succès' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update a stamp category
+app.put('/api/timbre-categories/:id', (req, res) => {
+  const { nom, poids_min, poids_max, type } = req.body;
+
+  try {
+    const result = db.prepare(
+      `UPDATE timbre_categories SET nom = ?, poids_min = ?, poids_max = ?, type = ? WHERE id = ?`
+    ).run(nom, poids_min, poids_max, type, req.params.id);
+
+    res.json({ message: 'Catégorie mise à jour', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a stamp category
+app.delete('/api/timbre-categories/:id', (req, res) => {
+  try {
+    // Check if any stamps use this category
+    const category = db.prepare('SELECT nom FROM timbre_categories WHERE id = ?').get(req.params.id);
+    if (category) {
+      const timbresCount = db.prepare('SELECT COUNT(*) as count FROM timbres WHERE poids_categorie = ?').get(category.nom);
+      if (timbresCount && timbresCount.count > 0) {
+        return res.status(400).json({ error: `Impossible de supprimer: ${timbresCount.count} timbre(s) utilisent cette catégorie` });
+      }
+    }
+
+    const result = db.prepare('DELETE FROM timbre_categories WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Catégorie supprimée', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============= STATISTIQUES =============
 
 app.get('/api/stats', (req, res) => {
