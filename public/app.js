@@ -916,7 +916,7 @@ function getStatutClass(statut) {
     return mapping[statut] || 'preparation';
 }
 
-function showAddColisModal() {
+async function showAddColisModal() {
     document.getElementById('formColis').reset();
     document.getElementById('colisId').value = '';
     // Réinitialiser les produits sélectionnés
@@ -925,6 +925,14 @@ function showAddColisModal() {
     updateProduitSelect();
     // Réinitialiser la sélection de timbre
     resetTimbreSelectors();
+    // S'assurer que les catégories et timbres sont à jour
+    if (timbreCategories.length === 0) {
+        await loadTimbreCategories();
+    }
+    if (timbres.length === 0) {
+        await loadTimbres();
+    }
+    updateAllTimbreCategorieSelects();
     document.getElementById('modalColis').classList.add('active');
 }
 
@@ -940,7 +948,7 @@ function fillClientAddress() {
     }
 }
 
-function editColis(id) {
+async function editColis(id) {
     const c = colis.find(col => col.id === id);
     if (!c) return;
 
@@ -982,6 +990,14 @@ function editColis(id) {
     selectedTimbreId = null;
     document.getElementById('selectedTimbreId').value = '';
     document.getElementById('timbreInfo').textContent = '';
+    // S'assurer que les catégories et timbres sont à jour
+    if (timbreCategories.length === 0) {
+        await loadTimbreCategories();
+    }
+    if (timbres.length === 0) {
+        await loadTimbres();
+    }
+    updateAllTimbreCategorieSelects();
     document.getElementById('colisTimbreCategorie').value = '';
     document.getElementById('colisTimbreSelect').innerHTML = '<option value="">Sélectionner un timbre...</option>';
 
@@ -2216,9 +2232,12 @@ function displayTimbres() {
                     <td><code style="font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan);">${t.numero_suivi}</code></td>
                     <td><a href="${lien}" target="_blank" class="product-link">🔗 Suivre</a></td>
                     <td>
-                        <button class="btn btn-small" style="background: var(--accent-green); color: white; border: none; cursor: pointer;" onclick="toggleTimbreStatut(${t.id})" title="Cliquer pour marquer comme utilisé">
-                            ✓ Disponible
-                        </button>
+                        <label class="toggle-switch" style="cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                            <span class="toggle-track" onclick="toggleTimbreStatut(${t.id})" style="width: 44px; height: 24px; background: var(--accent-green); border-radius: 12px; position: relative; display: inline-block; transition: background 0.2s;">
+                                <span class="toggle-thumb" style="position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: transform 0.2s;"></span>
+                            </span>
+                            <span style="color: var(--accent-green); font-weight: 500;">Disponible</span>
+                        </label>
                     </td>
                     <td class="actions">
                         <button class="btn btn-edit btn-small" onclick="showEditTimbreModal(${t.id})">✏️</button>
@@ -2248,14 +2267,18 @@ function displayTimbres() {
 
             data.utilises.forEach(t => {
                 const lien = `https://www.laposte.fr/outils/suivre-vos-envois?code=${t.numero_suivi}`;
+                const colisInfo = t.colis_numero_suivi ? ` (${t.colis_numero_suivi})` : '';
                 html += `
-                    <tr style="opacity: 0.7;">
+                    <tr style="opacity: 0.85;">
                         <td><code style="font-family: 'JetBrains Mono', monospace;">${t.numero_suivi}</code></td>
                         <td><a href="${lien}" target="_blank" class="product-link">🔗 Suivre</a></td>
                         <td>
-                            <button class="btn btn-small" style="background: var(--accent-orange); color: white; border: none; cursor: pointer;" onclick="toggleTimbreStatut(${t.id})" title="Cliquer pour marquer comme disponible">
-                                ✗ Utilisé${t.colis_numero_suivi ? ' (' + t.colis_numero_suivi + ')' : ''}
-                            </button>
+                            <label class="toggle-switch" style="cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                                <span class="toggle-track" onclick="toggleTimbreStatut(${t.id})" style="width: 44px; height: 24px; background: var(--accent-orange); border-radius: 12px; position: relative; display: inline-block; transition: background 0.2s;">
+                                    <span class="toggle-thumb" style="position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: transform 0.2s;"></span>
+                                </span>
+                                <span style="color: var(--accent-orange); font-weight: 500;">Utilisé${colisInfo}</span>
+                            </label>
                         </td>
                         <td class="actions">
                             <button class="btn btn-edit btn-small" onclick="showEditTimbreModal(${t.id})">✏️</button>
@@ -2457,6 +2480,9 @@ function updateTimbreSelect() {
     select.innerHTML = '<option value="">Sélectionner un timbre...</option>';
 
     if (!categorie) return;
+
+    console.log('Catégorie sélectionnée:', categorie);
+    console.log('Timbres disponibles:', timbres.filter(t => !t.utilise).map(t => ({ id: t.id, cat: t.poids_categorie })));
 
     // Filtrer les timbres disponibles de cette catégorie
     const timbresDisponibles = timbres.filter(t => t.poids_categorie === categorie && !t.utilise);
