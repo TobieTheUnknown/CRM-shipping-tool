@@ -100,6 +100,19 @@ function initDatabase() {
 
   try { db.exec(`ALTER TABLE produits ADD COLUMN dimension_id INTEGER REFERENCES dimensions(id)`); } catch (err) {}
 
+  // Table Timbres (stamps with tracking numbers)
+  db.exec(`CREATE TABLE IF NOT EXISTS timbres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero_suivi TEXT UNIQUE NOT NULL,
+    poids_categorie TEXT NOT NULL,
+    poids_min REAL NOT NULL,
+    poids_max REAL NOT NULL,
+    utilise INTEGER DEFAULT 0,
+    colis_id INTEGER,
+    date_creation DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (colis_id) REFERENCES colis (id) ON DELETE SET NULL
+  )`);
+
   // Insérer les dimensions par défaut si la table est vide
   const count = db.prepare('SELECT COUNT(*) as count FROM dimensions').get();
   if (count && count.count === 0) {

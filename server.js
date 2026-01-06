@@ -724,6 +724,117 @@ app.delete('/api/dimensions/:id', (req, res) => {
   }
 });
 
+// ============= ROUTES TIMBRES =============
+
+// Get all stamps
+app.get('/api/timbres', (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT t.*, c.numero_suivi as colis_numero_suivi
+      FROM timbres t
+      LEFT JOIN colis c ON t.colis_id = c.id
+      ORDER BY t.poids_min ASC, t.date_creation DESC
+    `).all();
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get available stamp for a specific weight (in kg)
+app.get('/api/timbres/disponible/:poids', (req, res) => {
+  try {
+    const poidsKg = parseFloat(req.params.poids);
+    const poidsG = poidsKg * 1000; // Convert to grams
+
+    const timbre = db.prepare(`
+      SELECT * FROM timbres
+      WHERE utilise = 0 AND poids_min <= ? AND poids_max >= ?
+      ORDER BY poids_min ASC
+      LIMIT 1
+    `).get(poidsG, poidsG);
+
+    res.json(timbre || null);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add stamps (bulk import from text)
+app.post('/api/timbres/import', (req, res) => {
+  const { numeros, poids_categorie, poids_min, poids_max } = req.body;
+
+  if (!numeros || !Array.isArray(numeros) || numeros.length === 0) {
+    return res.status(400).json({ error: 'Aucun numéro fourni' });
+  }
+
+  try {
+    const stmt = db.prepare(
+      `INSERT OR IGNORE INTO timbres (numero_suivi, poids_categorie, poids_min, poids_max)
+       VALUES (?, ?, ?, ?)`
+    );
+
+    let inserted = 0;
+    numeros.forEach(numero => {
+      const result = stmt.run(numero.trim(), poids_categorie, poids_min, poids_max);
+      if (result.changes > 0) inserted++;
+    });
+
+    res.json({ message: `${inserted} timbres ajoutés`, inserted, total: numeros.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Mark stamp as used (assign to colis)
+app.put('/api/timbres/:id/utiliser', (req, res) => {
+  const { colis_id } = req.body;
+
+  try {
+    const result = db.prepare(
+      `UPDATE timbres SET utilise = 1, colis_id = ? WHERE id = ?`
+    ).run(colis_id, req.params.id);
+
+    res.json({ message: 'Timbre marqué comme utilisé', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Release stamp (unassign from colis)
+app.put('/api/timbres/:id/liberer', (req, res) => {
+  try {
+    const result = db.prepare(
+      `UPDATE timbres SET utilise = 0, colis_id = NULL WHERE id = ?`
+    ).run(req.params.id);
+
+    res.json({ message: 'Timbre libéré', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete stamp
+app.delete('/api/timbres/:id', (req, res) => {
+  try {
+    const result = db.prepare('DELETE FROM timbres WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Timbre supprimé', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete all stamps in a category
+app.delete('/api/timbres/categorie/:categorie', (req, res) => {
+  try {
+    const result = db.prepare('DELETE FROM timbres WHERE poids_categorie = ? AND utilise = 0')
+      .run(req.params.categorie);
+    res.json({ message: `${result.changes} timbres supprimés`, changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============= STATISTIQUES =============
 
 app.get('/api/stats', (req, res) => {
@@ -735,6 +846,8 @@ app.get('/api/stats', (req, res) => {
     stats.colisEnPreparation = db.prepare("SELECT COUNT(*) as count FROM colis WHERE statut IN ('En préparation', 'Out of stock', 'Incomplet')").get().count;
     stats.colisEnvoyes = db.prepare("SELECT COUNT(*) as count FROM colis WHERE statut='Envoyé'").get().count;
     stats.colisOutOfStock = db.prepare("SELECT COUNT(*) as count FROM colis WHERE statut='Out of stock'").get().count;
+    stats.timbresDisponibles = db.prepare("SELECT COUNT(*) as count FROM timbres WHERE utilise = 0").get().count;
+    stats.timbresUtilises = db.prepare("SELECT COUNT(*) as count FROM timbres WHERE utilise = 1").get().count;
     res.json(stats);
   } catch (err) {
     res.status(500).json({ error: err.message });
