@@ -294,6 +294,9 @@
                 </div>
 
                 <div class="actions-bar">
+                    <div class="search-bar">
+                        <input type="text" id="searchClients" placeholder="🔍 Rechercher un client..." oninput="filterClients()">
+                    </div>
                     <button class="btn btn-primary" onclick="showAddClientModal()">+ Nouveau Client</button>
                 </div>
 
@@ -326,6 +329,9 @@
                 </div>
 
                 <div class="actions-bar">
+                    <div class="search-bar">
+                        <input type="text" id="searchProduits" placeholder="🔍 Rechercher un produit..." oninput="filterProduits()">
+                    </div>
                     <button class="btn btn-primary" onclick="showAddProduitModal()">+ Nouveau Produit</button>
                 </div>
 
@@ -540,16 +546,13 @@
                 <div id="colisProduitsContainer" class="colis-produits-container">
                     <!-- Produits ajoutés dynamiquement -->
                 </div>
-                <div class="form-row" style="align-items: flex-end; margin-top: 10px;">
-                    <div class="form-group" style="flex: 2;">
-                        <label>Ajouter un produit</label>
-                        <select id="selectProduitToAdd">
-                            <option value="">Sélectionner un produit...</option>
-                            <!-- Options générées dynamiquement -->
-                        </select>
-                    </div>
-                    <div class="form-group" style="flex: 0;">
-                        <button type="button" class="btn btn-secondary" onclick="addProduitToColis()">+ Ajouter</button>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label>Ajouter un produit</label>
+                    <div class="produit-search-container">
+                        <input type="text" id="searchProduitsColis" placeholder="🔍 Rechercher un produit..." oninput="filterProduitsForColis()">
+                        <div id="produitSearchResults" class="produit-search-results" style="display: none;">
+                            <!-- Résultats de recherche générés dynamiquement -->
+                        </div>
                     </div>
                 </div>
                 <div id="colisPoidsTotalInfo" style="margin-top: 10px; padding: 10px; background: #f0f7ff; border-radius: 6px; display: none;">
