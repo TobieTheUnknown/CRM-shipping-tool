@@ -5,6 +5,7 @@ let produits = [];
 let colis = [];
 let dimensions = [];
 let timbres = [];
+let timbreCategories = []; // Catégories de timbres dynamiques
 let selectedColis = new Set();
 let colisProduitsSelection = []; // Produits sélectionnés pour le colis en cours
 let selectedTimbreId = null; // Timbre sélectionné pour le colis en cours
@@ -19,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadColis();
     loadDimensions();
     loadTimbres();
+    loadTimbreCategories();
 });
 
 function initTabs() {
@@ -2105,14 +2107,20 @@ function handleProduitClick(colisId) {
 
 // ============= TIMBRES =============
 
-const POIDS_CATEGORIES = [
-    { id: '0-20', label: 'Moins de 20g', min: 0, max: 20 },
-    { id: '21-100', label: '21g - 100g', min: 21, max: 100 },
-    { id: '101-250', label: '101g - 250g', min: 101, max: 250 },
-    { id: '251-500', label: '251g - 500g', min: 251, max: 500 },
-    { id: '501-1000', label: '501g - 1kg', min: 501, max: 1000 },
-    { id: '1001-2000', label: '1kg - 2kg', min: 1001, max: 2000 }
+// Catégories par défaut (fallback si pas encore chargées de la DB)
+const POIDS_CATEGORIES_DEFAULT = [
+    { nom: 'Moins de 20g', poids_min: 0, poids_max: 20 },
+    { nom: '21g - 100g', poids_min: 21, poids_max: 100 },
+    { nom: '101g - 250g', poids_min: 101, poids_max: 250 },
+    { nom: '251g - 500g', poids_min: 251, poids_max: 500 },
+    { nom: '501g - 1kg', poids_min: 501, poids_max: 1000 },
+    { nom: '1kg - 2kg', poids_min: 1001, poids_max: 2000 }
 ];
+
+// Fonction pour obtenir les catégories (dynamiques ou fallback)
+function getTimbreCategories() {
+    return timbreCategories.length > 0 ? timbreCategories : POIDS_CATEGORIES_DEFAULT;
+}
 
 async function loadTimbres() {
     try {
@@ -2128,51 +2136,66 @@ function displayTimbres() {
     const container = document.getElementById('timbresListContainer');
     if (!container) return;
 
-    // Grouper les timbres par catégorie
+    const categories = getTimbreCategories();
+
+    // Grouper les timbres par catégorie (utiliser le nom comme clé)
     const grouped = {};
-    POIDS_CATEGORIES.forEach(cat => {
-        grouped[cat.id] = {
-            label: cat.label,
+    categories.forEach(cat => {
+        grouped[cat.nom] = {
+            label: cat.nom,
+            type: cat.type || 'national',
             disponibles: [],
             utilises: []
         };
     });
 
+    // Ajouter aussi les catégories qui ont des timbres mais ne sont pas dans la liste
     timbres.forEach(t => {
-        const catId = t.poids_categorie;
-        if (grouped[catId]) {
-            if (t.utilise) {
-                grouped[catId].utilises.push(t);
-            } else {
-                grouped[catId].disponibles.push(t);
-            }
+        const catNom = t.poids_categorie;
+        if (!grouped[catNom]) {
+            grouped[catNom] = {
+                label: catNom,
+                type: 'autre',
+                disponibles: [],
+                utilises: []
+            };
+        }
+        if (t.utilise) {
+            grouped[catNom].utilises.push(t);
+        } else {
+            grouped[catNom].disponibles.push(t);
         }
     });
 
     let html = '';
-    POIDS_CATEGORIES.forEach(cat => {
-        const data = grouped[cat.id];
+
+    // Trier les catégories par type puis par nom
+    const sortedCategories = Object.keys(grouped).sort((a, b) => {
+        const typeOrder = { national: 0, international: 1, autre: 2 };
+        const typeA = typeOrder[grouped[a].type] || 2;
+        const typeB = typeOrder[grouped[b].type] || 2;
+        if (typeA !== typeB) return typeA - typeB;
+        return a.localeCompare(b);
+    });
+
+    sortedCategories.forEach(catNom => {
+        const data = grouped[catNom];
         const total = data.disponibles.length + data.utilises.length;
+        const catId = catNom.replace(/[^a-zA-Z0-9]/g, '-'); // ID safe pour HTML
 
         if (total === 0) {
-            html += `
-                <div class="colis-section">
-                    <div class="section-title">
-                        <span>🎫 ${cat.label}</span>
-                        <span style="color: var(--text-muted);">Aucun timbre</span>
-                    </div>
-                </div>
-            `;
-            return;
+            return; // Ne pas afficher les catégories vides
         }
+
+        const typeIcon = data.type === 'international' ? '🌍' : (data.type === 'autre' ? '📦' : '🎫');
 
         html += `
             <div class="colis-section">
-                <div class="section-title collapsible" onclick="toggleTimbreSection('cat-${cat.id}')">
-                    <span>🎫 ${cat.label} - ${data.disponibles.length} disponible(s) / ${total} total</span>
-                    <span class="toggle-icon" id="toggle-cat-${cat.id}">▼</span>
+                <div class="section-title collapsible" onclick="toggleTimbreSection('cat-${catId}')">
+                    <span>${typeIcon} ${data.label} - ${data.disponibles.length} disponible(s) / ${total} total</span>
+                    <span class="toggle-icon" id="toggle-cat-${catId}">▼</span>
                 </div>
-                <div class="table-container" id="section-cat-${cat.id}">
+                <div class="table-container" id="section-cat-${catId}">
                     <table>
                         <thead>
                             <tr>
@@ -2198,6 +2221,7 @@ function displayTimbres() {
                         </button>
                     </td>
                     <td class="actions">
+                        <button class="btn btn-edit btn-small" onclick="showEditTimbreModal(${t.id})">✏️</button>
                         <button class="btn btn-danger btn-small" onclick="deleteTimbre(${t.id})">🗑️</button>
                     </td>
                 </tr>
@@ -2213,11 +2237,11 @@ function displayTimbres() {
         if (data.utilises.length > 0) {
             html += `
                     <div style="margin-top: 15px;">
-                        <div class="section-title collapsible" onclick="toggleTimbreSection('used-${cat.id}')" style="font-size: 13px; padding: 8px 12px; background: var(--bg-tertiary); border-radius: 6px;">
+                        <div class="section-title collapsible" onclick="toggleTimbreSection('used-${catId}')" style="font-size: 13px; padding: 8px 12px; background: var(--bg-tertiary); border-radius: 6px;">
                             <span style="opacity: 0.7;">📦 Timbres utilisés (${data.utilises.length})</span>
-                            <span class="toggle-icon" id="toggle-used-${cat.id}">►</span>
+                            <span class="toggle-icon" id="toggle-used-${catId}">►</span>
                         </div>
-                        <div class="table-container collapsed" id="section-used-${cat.id}" style="display: none;">
+                        <div class="table-container collapsed" id="section-used-${catId}" style="display: none;">
                             <table>
                                 <tbody>
             `;
@@ -2234,6 +2258,7 @@ function displayTimbres() {
                             </button>
                         </td>
                         <td class="actions">
+                            <button class="btn btn-edit btn-small" onclick="showEditTimbreModal(${t.id})">✏️</button>
                             <button class="btn btn-danger btn-small" onclick="deleteTimbre(${t.id})">🗑️</button>
                         </td>
                     </tr>
@@ -2251,7 +2276,7 @@ function displayTimbres() {
         html += `
                 </div>
                 <div style="margin-top: 10px;">
-                    <button class="btn btn-danger btn-small" onclick="deleteTimbreCategorie('${cat.id}')">
+                    <button class="btn btn-danger btn-small" onclick="deleteAllTimbresCategorie('${catNom}')">
                         🗑️ Supprimer tous les disponibles (${data.disponibles.length})
                     </button>
                 </div>
@@ -2259,7 +2284,28 @@ function displayTimbres() {
         `;
     });
 
+    if (html === '') {
+        html = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Aucun timbre. Importez des timbres ci-dessus.</p>';
+    }
+
     container.innerHTML = html;
+}
+
+// Supprimer tous les timbres disponibles d'une catégorie
+async function deleteAllTimbresCategorie(categorie) {
+    if (!confirm('Supprimer tous les timbres disponibles de cette catégorie ?')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/timbres/categorie/${encodeURIComponent(categorie)}`, { method: 'DELETE' });
+        if (response.ok) {
+            const result = await response.json();
+            alert(`${result.changes} timbre(s) supprimé(s)`);
+            loadTimbres();
+            loadStats();
+        }
+    } catch (error) {
+        console.error('Erreur suppression timbres:', error);
+    }
 }
 
 // Toggle section pour timbres
@@ -2351,22 +2397,6 @@ async function deleteTimbre(id) {
         }
     } catch (error) {
         console.error('Erreur suppression timbre:', error);
-    }
-}
-
-async function deleteTimbreCategorie(categorie) {
-    if (!confirm('Supprimer tous les timbres disponibles de cette catégorie ?')) return;
-
-    try {
-        const response = await fetch(`${API_URL}/api/timbres/categorie/${encodeURIComponent(categorie)}`, { method: 'DELETE' });
-        if (response.ok) {
-            const result = await response.json();
-            alert(`${result.changes} timbre(s) supprimé(s)`);
-            loadTimbres();
-            loadStats();
-        }
-    } catch (error) {
-        console.error('Erreur suppression timbres:', error);
     }
 }
 
@@ -2508,9 +2538,10 @@ async function autoSelectTimbre() {
     } else {
         // Trouver la catégorie correspondant au poids pour aider l'utilisateur
         const poidsG = poids * 1000;
-        const categorie = POIDS_CATEGORIES.find(c => poidsG >= c.min && poidsG <= c.max);
+        const categories = getTimbreCategories();
+        const categorie = categories.find(c => poidsG >= c.poids_min && poidsG <= c.poids_max);
         if (categorie) {
-            document.getElementById('colisTimbreCategorie').value = categorie.id;
+            document.getElementById('colisTimbreCategorie').value = categorie.nom;
             updateTimbreSelect();
         }
 
@@ -2534,5 +2565,217 @@ async function markTimbreAsUsed(timbreId, colisId) {
         loadStats();
     } catch (error) {
         console.error('Erreur marquage timbre:', error);
+    }
+}
+
+// ============= CATÉGORIES DE TIMBRES =============
+
+async function loadTimbreCategories() {
+    try {
+        const response = await fetch(`${API_URL}/api/timbre-categories`);
+        timbreCategories = await response.json();
+        displayTimbreCategories();
+        updateAllTimbreCategorieSelects();
+    } catch (error) {
+        console.error('Erreur chargement catégories timbres:', error);
+    }
+}
+
+function displayTimbreCategories() {
+    const container = document.getElementById('timbreCategoriesList');
+    if (!container) return;
+
+    if (timbreCategories.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #666;">Aucune catégorie</p>';
+        return;
+    }
+
+    // Grouper par type
+    const grouped = { national: [], international: [], autre: [] };
+    timbreCategories.forEach(cat => {
+        const type = cat.type || 'national';
+        if (!grouped[type]) grouped[type] = [];
+        grouped[type].push(cat);
+    });
+
+    let html = '';
+    const typeLabels = { national: '🇫🇷 National', international: '🌍 International', autre: '📦 Autre' };
+
+    Object.keys(grouped).forEach(type => {
+        if (grouped[type].length === 0) return;
+        html += `<div style="margin-bottom: 15px;"><h4 style="margin-bottom: 8px; color: var(--text-secondary);">${typeLabels[type] || type}</h4>`;
+        grouped[type].forEach(cat => {
+            html += `
+                <div class="dimension-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-tertiary); border-radius: 6px; margin-bottom: 6px;">
+                    <div>
+                        <strong>${cat.nom}</strong>
+                        <span style="color: var(--text-muted); font-size: 12px; margin-left: 8px;">${cat.poids_min}g - ${cat.poids_max}g</span>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-edit btn-small" onclick="editTimbreCategorie(${cat.id})">✏️</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteTimbreCategorie(${cat.id})">🗑️</button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+    });
+
+    container.innerHTML = html;
+}
+
+async function saveTimbreCategorie() {
+    const id = document.getElementById('timbreCategorieId').value;
+    const data = {
+        nom: document.getElementById('timbreCategorieNom').value,
+        type: document.getElementById('timbreCategorieType').value,
+        poids_min: parseFloat(document.getElementById('timbreCategoriePoidsMin').value) || 0,
+        poids_max: parseFloat(document.getElementById('timbreCategoriePoidsMax').value) || 100
+    };
+
+    if (!data.nom) {
+        alert('Veuillez entrer un nom pour la catégorie');
+        return;
+    }
+
+    try {
+        const url = id ? `${API_URL}/api/timbre-categories/${id}` : `${API_URL}/api/timbre-categories`;
+        const method = id ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            cancelTimbreCategorieEdit();
+            loadTimbreCategories();
+        } else {
+            const error = await response.json();
+            alert('Erreur: ' + error.error);
+        }
+    } catch (error) {
+        console.error('Erreur sauvegarde catégorie:', error);
+        alert('Erreur lors de la sauvegarde');
+    }
+}
+
+function editTimbreCategorie(id) {
+    const cat = timbreCategories.find(c => c.id === id);
+    if (!cat) return;
+
+    document.getElementById('timbreCategorieId').value = cat.id;
+    document.getElementById('timbreCategorieNom').value = cat.nom;
+    document.getElementById('timbreCategorieType').value = cat.type || 'national';
+    document.getElementById('timbreCategoriePoidsMin').value = cat.poids_min;
+    document.getElementById('timbreCategoriePoidsMax').value = cat.poids_max;
+
+    document.getElementById('timbreCategorieFormTitle').textContent = 'Modifier la catégorie';
+    document.getElementById('btnCancelTimbreCategorie').style.display = 'inline-block';
+}
+
+async function deleteTimbreCategorie(id) {
+    if (!confirm('Supprimer cette catégorie ?')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/timbre-categories/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+            loadTimbreCategories();
+        } else {
+            const error = await response.json();
+            alert('Erreur: ' + error.error);
+        }
+    } catch (error) {
+        console.error('Erreur suppression catégorie:', error);
+    }
+}
+
+function cancelTimbreCategorieEdit() {
+    document.getElementById('timbreCategorieId').value = '';
+    document.getElementById('timbreCategorieNom').value = '';
+    document.getElementById('timbreCategorieType').value = 'national';
+    document.getElementById('timbreCategoriePoidsMin').value = '';
+    document.getElementById('timbreCategoriePoidsMax').value = '';
+    document.getElementById('timbreCategorieFormTitle').textContent = 'Ajouter une catégorie';
+    document.getElementById('btnCancelTimbreCategorie').style.display = 'none';
+}
+
+// Mettre à jour tous les selects de catégories de timbres
+function updateAllTimbreCategorieSelects() {
+    // Select dans la page Timbres (import)
+    const importSelect = document.getElementById('timbrePoidsCategorie');
+    if (importSelect) {
+        importSelect.innerHTML = timbreCategories.map(cat =>
+            `<option value="${cat.nom}" data-min="${cat.poids_min}" data-max="${cat.poids_max}">${cat.nom}</option>`
+        ).join('');
+    }
+
+    // Select dans le modal colis
+    const colisSelect = document.getElementById('colisTimbreCategorie');
+    if (colisSelect) {
+        colisSelect.innerHTML = '<option value="">Catégorie...</option>' + timbreCategories.map(cat =>
+            `<option value="${cat.nom}" data-min="${cat.poids_min}" data-max="${cat.poids_max}">${cat.nom}</option>`
+        ).join('');
+    }
+
+    // Select dans le modal d'édition de timbre
+    const editSelect = document.getElementById('editTimbreCategorie');
+    if (editSelect) {
+        editSelect.innerHTML = timbreCategories.map(cat =>
+            `<option value="${cat.nom}" data-min="${cat.poids_min}" data-max="${cat.poids_max}">${cat.nom}</option>`
+        ).join('');
+    }
+}
+
+// ============= ÉDITION DE TIMBRE =============
+
+function showEditTimbreModal(id) {
+    const timbre = timbres.find(t => t.id === id);
+    if (!timbre) return;
+
+    document.getElementById('editTimbreId').value = timbre.id;
+    document.getElementById('editTimbreNumero').value = timbre.numero_suivi;
+
+    // S'assurer que les catégories sont dans le select
+    updateAllTimbreCategorieSelects();
+
+    // Sélectionner la catégorie actuelle
+    document.getElementById('editTimbreCategorie').value = timbre.poids_categorie;
+
+    document.getElementById('modalEditTimbre').classList.add('active');
+}
+
+async function saveEditTimbre(event) {
+    event.preventDefault();
+
+    const id = document.getElementById('editTimbreId').value;
+    const select = document.getElementById('editTimbreCategorie');
+    const selectedOption = select.options[select.selectedIndex];
+
+    const data = {
+        numero_suivi: document.getElementById('editTimbreNumero').value,
+        poids_categorie: select.value,
+        poids_min: parseFloat(selectedOption.dataset.min) || 0,
+        poids_max: parseFloat(selectedOption.dataset.max) || 100
+    };
+
+    try {
+        const response = await fetch(`${API_URL}/api/timbres/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            closeModal('modalEditTimbre');
+            loadTimbres();
+        } else {
+            const error = await response.json();
+            alert('Erreur: ' + error.error);
+        }
+    } catch (error) {
+        console.error('Erreur édition timbre:', error);
+        alert('Erreur lors de la sauvegarde');
     }
 }

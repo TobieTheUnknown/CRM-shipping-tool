@@ -113,6 +113,32 @@ function initDatabase() {
     FOREIGN KEY (colis_id) REFERENCES colis (id) ON DELETE SET NULL
   )`);
 
+  // Table Catégories de timbres (types personnalisables)
+  db.exec(`CREATE TABLE IF NOT EXISTS timbre_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    poids_min REAL NOT NULL,
+    poids_max REAL NOT NULL,
+    type TEXT DEFAULT 'national',
+    date_creation DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Insérer les catégories par défaut si la table est vide
+  const catCount = db.prepare('SELECT COUNT(*) as count FROM timbre_categories').get();
+  if (catCount && catCount.count === 0) {
+    const defaultCategories = [
+      ['Moins de 20g', 0, 20, 'national'],
+      ['21g - 100g', 21, 100, 'national'],
+      ['101g - 250g', 101, 250, 'national'],
+      ['251g - 500g', 251, 500, 'national'],
+      ['501g - 1kg', 501, 1000, 'national'],
+      ['1kg - 2kg', 1001, 2000, 'national']
+    ];
+    const stmtCat = db.prepare('INSERT INTO timbre_categories (nom, poids_min, poids_max, type) VALUES (?, ?, ?, ?)');
+    defaultCategories.forEach(c => stmtCat.run(...c));
+    console.log('🎫 Catégories de timbres par défaut créées.');
+  }
+
   // Insérer les dimensions par défaut si la table est vide
   const count = db.prepare('SELECT COUNT(*) as count FROM dimensions').get();
   if (count && count.count === 0) {
