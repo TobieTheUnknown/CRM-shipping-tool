@@ -917,7 +917,6 @@ function showAddColisModal() {
     colisProduitsSelection = [];
     displayColisProduitsSelection();
     updateProduitSelect();
-    document.getElementById('colisPoidsTotalInfo').style.display = 'none';
     document.getElementById('modalColis').classList.add('active');
 }
 
@@ -969,13 +968,6 @@ function editColis(id) {
     }
     displayColisProduitsSelection();
     updateProduitSelect();
-
-    if (c.poids) {
-        document.getElementById('colisPoidsTotalValue').textContent = c.poids;
-        document.getElementById('colisPoidsTotalInfo').style.display = 'block';
-    } else {
-        document.getElementById('colisPoidsTotalInfo').style.display = 'none';
-    }
 
     document.getElementById('modalColis').classList.add('active');
 }
@@ -1918,13 +1910,6 @@ function removeProduitFromColis(index) {
 
 // Calculer le poids total et sélectionner la bonne dimension
 function calculatePoidsAndDimension() {
-    if (colisProduitsSelection.length === 0) {
-        document.getElementById('colisPoids').value = '';
-        document.getElementById('colisDimensions').value = '';
-        document.getElementById('colisPoidsTotalInfo').style.display = 'none';
-        return;
-    }
-
     // Trouver la plus grande dimension parmi les produits
     let maxDimensionId = null;
     let maxVolume = 0;
@@ -1943,50 +1928,49 @@ function calculatePoidsAndDimension() {
     });
 
     // Si on a trouvé une dimension, l'utiliser
-    let poidsCarton = 0;
     if (maxDimensionId) {
         const selectedDim = dimensions.find(d => d.id === maxDimensionId);
         if (selectedDim) {
             document.getElementById('colisDimensions').value = `${selectedDim.longueur}x${selectedDim.largeur}x${selectedDim.hauteur}cm`;
-            poidsCarton = selectedDim.poids_carton || 0;
         }
     }
 
-    // Calculer le poids total des produits
+    // Calculer et mettre à jour le poids
+    updatePoidsTotal();
+}
+
+// Calculer le poids total (produits + carton actuel)
+function updatePoidsTotal() {
+    // Calculer le poids des produits
     let poidsProduits = 0;
     colisProduitsSelection.forEach(p => {
         poidsProduits += (p.poids || 0) * p.quantite;
     });
 
-    const poidsTotal = poidsProduits + poidsCarton;
-    document.getElementById('colisPoids').value = poidsTotal.toFixed(2);
+    // Récupérer le poids du carton actuel depuis les dimensions sélectionnées
+    let poidsCarton = 0;
+    const dimensionsValue = document.getElementById('colisDimensions').value;
+    if (dimensionsValue) {
+        const dimMatch = dimensionsValue.replace('cm', '').split('x').map(parseFloat);
+        if (dimMatch.length === 3) {
+            const matchingDim = dimensions.find(d =>
+                d.longueur === dimMatch[0] && d.largeur === dimMatch[1] && d.hauteur === dimMatch[2]
+            );
+            if (matchingDim) {
+                poidsCarton = matchingDim.poids_carton || 0;
+            }
+        }
+    }
 
-    // Afficher l'info du poids total
-    document.getElementById('colisPoidsTotalValue').textContent = poidsTotal.toFixed(2);
-    document.getElementById('colisPoidsTotalInfo').style.display = 'block';
+    const poidsTotal = poidsProduits + poidsCarton;
+    document.getElementById('colisPoids').value = poidsTotal > 0 ? poidsTotal.toFixed(2) : '';
 }
 
 // Sélection manuelle d'une dimension (boutons)
 function setDimension(dimension) {
     document.getElementById('colisDimensions').value = dimension + 'cm';
-
-    // Recalculer le poids avec le poids du carton
-    const dimParts = dimension.split('x').map(parseFloat);
-    if (dimParts.length === 3) {
-        const matchingDim = dimensions.find(d =>
-            d.longueur === dimParts[0] && d.largeur === dimParts[1] && d.hauteur === dimParts[2]
-        );
-        if (matchingDim && colisProduitsSelection.length > 0) {
-            let poidsProduits = 0;
-            colisProduitsSelection.forEach(p => {
-                poidsProduits += (p.poids || 0) * p.quantite;
-            });
-            const poidsTotal = poidsProduits + (matchingDim.poids_carton || 0);
-            document.getElementById('colisPoids').value = poidsTotal.toFixed(2);
-            document.getElementById('colisPoidsTotalValue').textContent = poidsTotal.toFixed(2);
-            document.getElementById('colisPoidsTotalInfo').style.display = 'block';
-        }
-    }
+    // Recalculer le poids avec le nouveau carton
+    updatePoidsTotal();
 }
 
 // ============= MODAL PRODUITS DU COLIS =============
