@@ -2,40 +2,12 @@
 .git
 .gitignore
 
-# GitHub
-.github
-
 # Build artifacts
-dist
-*.dmg
-*.exe
-*.AppImage
-*.deb
-
-# Electron specific
-electron
+*.db
 
 # Development
 node_modules
 *.log
-npm-debug.log*
-
-# Database (will be created in /data volume)
-crm.db
-*.db
-
-# Documentation
-*.md
-LICENSE
-
-# IDE
-.vscode
-.idea
-*.swp
-*.swo
-
-# Test files
-uploads
 
 # OS files
 .DS_Store

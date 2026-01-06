@@ -2,23 +2,8 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-// Déterminer le chemin des données
-function getDataPath() {
-  // Docker/Synology: utiliser DATA_PATH env var
-  if (process.env.DATA_PATH) {
-    return process.env.DATA_PATH;
-  }
-
-  // Electron packagé: utiliser resourcesPath
-  if (process.resourcesPath && !process.resourcesPath.includes('node_modules')) {
-    return process.resourcesPath;
-  }
-
-  // Développement: utiliser le dossier courant
-  return __dirname;
-}
-
-const dataPath = getDataPath();
+// Chemin des données via variable d'environnement DATA_PATH ou dossier courant
+const dataPath = process.env.DATA_PATH || __dirname;
 const dbPath = path.join(dataPath, 'crm.db');
 
 console.log(`📁 Chemin données: ${dataPath}`);
@@ -78,26 +63,11 @@ function initDatabase() {
     FOREIGN KEY (client_id) REFERENCES clients (id)
   )`);
 
-  // Ajouter la colonne reference si elle n'existe pas (pour migration)
-  try {
-    db.exec(`ALTER TABLE colis ADD COLUMN reference TEXT`);
-  } catch (err) {
-    // Colonne existe déjà
-  }
-
-  // Ajouter les colonnes wallet et lien aux clients (pour migration)
-  try {
-    db.exec(`ALTER TABLE clients ADD COLUMN wallet TEXT`);
-  } catch (err) {}
-
-  try {
-    db.exec(`ALTER TABLE clients ADD COLUMN lien TEXT`);
-  } catch (err) {}
-
-  // Ajouter ligne d'adresse supplémentaire pour les colis
-  try {
-    db.exec(`ALTER TABLE colis ADD COLUMN adresse_ligne2 TEXT`);
-  } catch (err) {}
+  // Migrations pour colonnes additionnelles
+  try { db.exec(`ALTER TABLE colis ADD COLUMN reference TEXT`); } catch (err) {}
+  try { db.exec(`ALTER TABLE clients ADD COLUMN wallet TEXT`); } catch (err) {}
+  try { db.exec(`ALTER TABLE clients ADD COLUMN lien TEXT`); } catch (err) {}
+  try { db.exec(`ALTER TABLE colis ADD COLUMN adresse_ligne2 TEXT`); } catch (err) {}
 
   // Table Produits dans Colis (relation many-to-many)
   db.exec(`CREATE TABLE IF NOT EXISTS colis_produits (
@@ -120,10 +90,7 @@ function initDatabase() {
     date_creation DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Ajouter dimension_id aux produits pour lien optionnel
-  try {
-    db.exec(`ALTER TABLE produits ADD COLUMN dimension_id INTEGER REFERENCES dimensions(id)`);
-  } catch (err) {}
+  try { db.exec(`ALTER TABLE produits ADD COLUMN dimension_id INTEGER REFERENCES dimensions(id)`); } catch (err) {}
 
   // Insérer les dimensions par défaut si la table est vide
   const count = db.prepare('SELECT COUNT(*) as count FROM dimensions').get();
@@ -145,6 +112,5 @@ function initDatabase() {
 
 initDatabase();
 
-// Exporter aussi le chemin des données pour les autres modules
 module.exports = db;
 module.exports.dataPath = dataPath;

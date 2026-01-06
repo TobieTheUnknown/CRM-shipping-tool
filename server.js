@@ -9,7 +9,7 @@ const csv = require('csv-parser');
 const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 6389;
 
 // Chemin des données (partagé avec database.js)
 const dataPath = db.dataPath || __dirname;
