@@ -1044,15 +1044,17 @@ async function saveColis(event) {
         if (response.ok) {
             const result = await response.json();
 
-            // Si nouveau colis et timbre sélectionné, le marquer comme utilisé
+            // Si un timbre est sélectionné, le marquer comme utilisé
             const timbreId = document.getElementById('selectedTimbreId').value;
-            if (!id && timbreId && result.id) {
-                await markTimbreAsUsed(timbreId, result.id);
+            const colisId = result.id || id; // ID du nouveau colis ou colis existant
+            if (timbreId && colisId) {
+                await markTimbreAsUsed(timbreId, colisId);
             }
 
             closeModal('modalColis');
             loadColis();
             loadProduits(); // Recharger les produits pour mettre à jour le stock
+            loadTimbres(); // Recharger les timbres pour mettre à jour les statuts
             loadStats();
 
             // Vérifier si des produits sont en stock négatif
