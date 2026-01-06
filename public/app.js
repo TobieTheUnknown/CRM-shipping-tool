@@ -250,6 +250,10 @@ async function saveClient(event) {
         lien: JSON.stringify(liens)
     };
 
+    // Fermer la modale immédiatement
+    closeModal('modalClient');
+
+    // Sauvegarder en arrière-plan
     try {
         const url = id ? `${API_URL}/api/clients/${id}` : `${API_URL}/api/clients`;
         const method = id ? 'PUT' : 'POST';
@@ -261,9 +265,10 @@ async function saveClient(event) {
         });
 
         if (response.ok) {
-            closeModal('modalClient');
             await Promise.all([loadClients(), loadStats()]);
             showToast('Client enregistré avec succès!');
+        } else {
+            showToast('Erreur lors de la sauvegarde du client', 'error');
         }
     } catch (error) {
         console.error('Erreur sauvegarde client:', error);
@@ -1089,6 +1094,13 @@ async function saveColis(event) {
         produits: produitsToSend
     };
 
+    // Capturer l'ID du timbre avant de fermer la modale
+    const timbreId = document.getElementById('selectedTimbreId').value;
+
+    // Fermer la modale immédiatement
+    closeModal('modalColis');
+
+    // Sauvegarder en arrière-plan
     try {
         const url = id ? `${API_URL}/api/colis/${id}` : `${API_URL}/api/colis`;
         const method = id ? 'PUT' : 'POST';
@@ -1103,13 +1115,11 @@ async function saveColis(event) {
             const result = await response.json();
 
             // Si un timbre est sélectionné, le marquer comme utilisé
-            const timbreId = document.getElementById('selectedTimbreId').value;
             const colisId = result.id || id; // ID du nouveau colis ou colis existant
             if (timbreId && colisId) {
                 await markTimbreAsUsed(timbreId, colisId);
             }
 
-            closeModal('modalColis');
             // Paralléliser les rechargements pour une meilleure performance
             await Promise.all([loadColis(), loadProduits(), loadTimbres(), loadStats()]);
 
@@ -1124,6 +1134,8 @@ async function saveColis(event) {
             } else {
                 showToast('Colis enregistré avec succès!');
             }
+        } else {
+            showToast('Erreur lors de la sauvegarde du colis', 'error');
         }
     } catch (error) {
         console.error('Erreur sauvegarde colis:', error);
@@ -1731,10 +1743,15 @@ async function saveDimension() {
     }
 
     const data = { nom, longueur, largeur, hauteur, poids_carton, is_default: false };
+    const isEdit = !!id;
 
+    // Réinitialiser le formulaire immédiatement
+    cancelDimensionEdit();
+
+    // Sauvegarder en arrière-plan
     try {
-        const url = id ? `${API_URL}/api/dimensions/${id}` : `${API_URL}/api/dimensions`;
-        const method = id ? 'PUT' : 'POST';
+        const url = isEdit ? `${API_URL}/api/dimensions/${id}` : `${API_URL}/api/dimensions`;
+        const method = isEdit ? 'PUT' : 'POST';
 
         const response = await fetch(url, {
             method,
@@ -1743,9 +1760,8 @@ async function saveDimension() {
         });
 
         if (response.ok) {
-            cancelDimensionEdit();
             loadDimensions();
-            showToast(id ? 'Dimension modifiée!' : 'Dimension créée!');
+            showToast(isEdit ? 'Dimension modifiée!' : 'Dimension créée!');
         } else {
             showToast('Erreur lors de la sauvegarde', 'error');
         }
