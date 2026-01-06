@@ -922,11 +922,7 @@ function showAddColisModal() {
     displayColisProduitsSelection();
     updateProduitSelect();
     // Réinitialiser la sélection de timbre
-    selectedTimbreId = null;
-    document.getElementById('selectedTimbreId').value = '';
-    document.getElementById('timbreInfo').textContent = '';
-    document.getElementById('timbreInfo').style.color = 'var(--accent-green)';
-    document.getElementById('lienSuiviBtn').style.display = 'none';
+    resetTimbreSelectors();
     document.getElementById('modalColis').classList.add('active');
 }
 
@@ -979,10 +975,29 @@ function editColis(id) {
     displayColisProduitsSelection();
     updateProduitSelect();
 
-    // Pour édition, pas de timbre auto-sélectionné mais on affiche le lien si existe
+    // Pour édition, réinitialiser les sélecteurs de timbres
+    // mais conserver le numéro de suivi existant
     selectedTimbreId = null;
     document.getElementById('selectedTimbreId').value = '';
     document.getElementById('timbreInfo').textContent = '';
+    document.getElementById('colisTimbreCategorie').value = '';
+    document.getElementById('colisTimbreSelect').innerHTML = '<option value="">Sélectionner un timbre...</option>';
+
+    // Si le colis a déjà un numéro de suivi, chercher le timbre correspondant
+    if (c.numero_suivi) {
+        const timbreExistant = timbres.find(t => t.numero_suivi === c.numero_suivi);
+        if (timbreExistant) {
+            document.getElementById('colisTimbreCategorie').value = timbreExistant.poids_categorie;
+            updateTimbreSelect();
+            // Ne pas sélectionner le timbre dans la liste s'il est déjà utilisé
+            if (!timbreExistant.utilise) {
+                document.getElementById('colisTimbreSelect').value = timbreExistant.id;
+                selectedTimbreId = timbreExistant.id;
+                document.getElementById('selectedTimbreId').value = timbreExistant.id;
+            }
+        }
+    }
+
     updateLienSuiviPreview();
 
     document.getElementById('modalColis').classList.add('active');
@@ -2151,11 +2166,11 @@ function displayTimbres() {
 
         html += `
             <div class="colis-section">
-                <div class="section-title collapsible" onclick="toggleSection(this)">
+                <div class="section-title collapsible" onclick="toggleTimbreSection('cat-${cat.id}')">
                     <span>🎫 ${cat.label} - ${data.disponibles.length} disponible(s) / ${total} total</span>
-                    <span class="toggle-icon">▼</span>
+                    <span class="toggle-icon" id="toggle-cat-${cat.id}">▼</span>
                 </div>
-                <div class="table-container">
+                <div class="table-container" id="section-cat-${cat.id}">
                     <table>
                         <thead>
                             <tr>
@@ -2175,24 +2190,13 @@ function displayTimbres() {
                 <tr>
                     <td><code style="font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan);">${t.numero_suivi}</code></td>
                     <td><a href="${lien}" target="_blank" class="product-link">🔗 Suivre</a></td>
-                    <td><span class="badge badge-envoye">Disponible</span></td>
+                    <td>
+                        <button class="btn btn-small" style="background: var(--accent-green); color: white; border: none; cursor: pointer;" onclick="toggleTimbreStatut(${t.id})" title="Cliquer pour marquer comme utilisé">
+                            ✓ Disponible
+                        </button>
+                    </td>
                     <td class="actions">
                         <button class="btn btn-danger btn-small" onclick="deleteTimbre(${t.id})">🗑️</button>
-                    </td>
-                </tr>
-            `;
-        });
-
-        // Puis les utilisés
-        data.utilises.forEach(t => {
-            const lien = `https://www.laposte.fr/outils/suivre-vos-envois?code=${t.numero_suivi}`;
-            html += `
-                <tr style="opacity: 0.6;">
-                    <td><code style="font-family: 'JetBrains Mono', monospace;">${t.numero_suivi}</code></td>
-                    <td><a href="${lien}" target="_blank" class="product-link">🔗 Suivre</a></td>
-                    <td><span class="badge badge-preparation">Utilisé${t.colis_numero_suivi ? ' - ' + t.colis_numero_suivi : ''}</span></td>
-                    <td class="actions">
-                        <button class="btn btn-secondary btn-small" onclick="libererTimbre(${t.id})">↩️ Libérer</button>
                     </td>
                 </tr>
             `;
@@ -2201,6 +2205,48 @@ function displayTimbres() {
         html += `
                         </tbody>
                     </table>
+        `;
+
+        // Section repliée pour les timbres utilisés
+        if (data.utilises.length > 0) {
+            html += `
+                    <div style="margin-top: 15px;">
+                        <div class="section-title collapsible" onclick="toggleTimbreSection('used-${cat.id}')" style="font-size: 13px; padding: 8px 12px; background: var(--bg-tertiary); border-radius: 6px;">
+                            <span style="opacity: 0.7;">📦 Timbres utilisés (${data.utilises.length})</span>
+                            <span class="toggle-icon" id="toggle-used-${cat.id}">►</span>
+                        </div>
+                        <div class="table-container collapsed" id="section-used-${cat.id}" style="display: none;">
+                            <table>
+                                <tbody>
+            `;
+
+            data.utilises.forEach(t => {
+                const lien = `https://www.laposte.fr/outils/suivre-vos-envois?code=${t.numero_suivi}`;
+                html += `
+                    <tr style="opacity: 0.7;">
+                        <td><code style="font-family: 'JetBrains Mono', monospace;">${t.numero_suivi}</code></td>
+                        <td><a href="${lien}" target="_blank" class="product-link">🔗 Suivre</a></td>
+                        <td>
+                            <button class="btn btn-small" style="background: var(--accent-orange); color: white; border: none; cursor: pointer;" onclick="toggleTimbreStatut(${t.id})" title="Cliquer pour marquer comme disponible">
+                                ✗ Utilisé${t.colis_numero_suivi ? ' (' + t.colis_numero_suivi + ')' : ''}
+                            </button>
+                        </td>
+                        <td class="actions">
+                            <button class="btn btn-danger btn-small" onclick="deleteTimbre(${t.id})">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+            `;
+        }
+
+        html += `
                 </div>
                 <div style="margin-top: 10px;">
                     <button class="btn btn-danger btn-small" onclick="deleteTimbreCategorie('${cat.id}')">
@@ -2212,6 +2258,37 @@ function displayTimbres() {
     });
 
     container.innerHTML = html;
+}
+
+// Toggle section pour timbres
+function toggleTimbreSection(sectionId) {
+    const section = document.getElementById(`section-${sectionId}`);
+    const icon = document.getElementById(`toggle-${sectionId}`);
+
+    if (!section || !icon) return;
+
+    if (section.style.display === 'none' || section.classList.contains('collapsed')) {
+        section.style.display = 'block';
+        section.classList.remove('collapsed');
+        icon.textContent = '▼';
+    } else {
+        section.style.display = 'none';
+        section.classList.add('collapsed');
+        icon.textContent = '►';
+    }
+}
+
+// Toggle statut d'un timbre (utilisé/disponible)
+async function toggleTimbreStatut(id) {
+    try {
+        const response = await fetch(`${API_URL}/api/timbres/${id}/toggle`, { method: 'PUT' });
+        if (response.ok) {
+            loadTimbres();
+            loadStats();
+        }
+    } catch (error) {
+        console.error('Erreur toggle timbre:', error);
+    }
 }
 
 async function importTimbres() {
@@ -2339,6 +2416,66 @@ function updateLienSuiviPreview() {
     }
 }
 
+// Mettre à jour le sélecteur de timbres en fonction de la catégorie
+function updateTimbreSelect() {
+    const categorie = document.getElementById('colisTimbreCategorie').value;
+    const select = document.getElementById('colisTimbreSelect');
+
+    // Reset
+    select.innerHTML = '<option value="">Sélectionner un timbre...</option>';
+
+    if (!categorie) return;
+
+    // Filtrer les timbres disponibles de cette catégorie
+    const timbresDisponibles = timbres.filter(t => t.poids_categorie === categorie && !t.utilise);
+
+    if (timbresDisponibles.length === 0) {
+        select.innerHTML = '<option value="">Aucun timbre disponible</option>';
+        return;
+    }
+
+    timbresDisponibles.forEach(t => {
+        const option = document.createElement('option');
+        option.value = t.id;
+        option.textContent = t.numero_suivi;
+        option.dataset.numero = t.numero_suivi;
+        select.appendChild(option);
+    });
+}
+
+// Sélectionner un timbre depuis le menu déroulant
+function selectTimbreFromDropdown() {
+    const select = document.getElementById('colisTimbreSelect');
+    const selectedOption = select.options[select.selectedIndex];
+
+    if (!select.value) {
+        document.getElementById('selectedTimbreId').value = '';
+        document.getElementById('colisNumeroSuivi').value = '';
+        document.getElementById('timbreInfo').textContent = '';
+        selectedTimbreId = null;
+        updateLienSuiviPreview();
+        return;
+    }
+
+    selectedTimbreId = parseInt(select.value);
+    document.getElementById('selectedTimbreId').value = select.value;
+    document.getElementById('colisNumeroSuivi').value = selectedOption.dataset.numero;
+    document.getElementById('timbreInfo').textContent = '(timbre sélectionné)';
+    document.getElementById('timbreInfo').style.color = 'var(--accent-green)';
+    updateLienSuiviPreview();
+}
+
+// Reset les sélecteurs de timbres
+function resetTimbreSelectors() {
+    document.getElementById('colisTimbreCategorie').value = '';
+    document.getElementById('colisTimbreSelect').innerHTML = '<option value="">Sélectionner un timbre...</option>';
+    document.getElementById('selectedTimbreId').value = '';
+    document.getElementById('colisNumeroSuivi').value = '';
+    document.getElementById('timbreInfo').textContent = '';
+    document.getElementById('lienSuiviBtn').style.display = 'none';
+    selectedTimbreId = null;
+}
+
 // Sélectionner automatiquement un timbre basé sur le poids
 async function autoSelectTimbre() {
     const poidsValue = document.getElementById('colisPoids').value;
@@ -2358,8 +2495,23 @@ async function autoSelectTimbre() {
         document.getElementById('selectedTimbreId').value = timbre.id;
         document.getElementById('colisNumeroSuivi').value = timbre.numero_suivi;
         document.getElementById('timbreInfo').textContent = '(timbre auto-sélectionné)';
+        document.getElementById('timbreInfo').style.color = 'var(--accent-green)';
+
+        // Mettre à jour les sélecteurs
+        document.getElementById('colisTimbreCategorie').value = timbre.poids_categorie;
+        updateTimbreSelect();
+        document.getElementById('colisTimbreSelect').value = timbre.id;
+
         updateLienSuiviPreview();
     } else {
+        // Trouver la catégorie correspondant au poids pour aider l'utilisateur
+        const poidsG = poids * 1000;
+        const categorie = POIDS_CATEGORIES.find(c => poidsG >= c.min && poidsG <= c.max);
+        if (categorie) {
+            document.getElementById('colisTimbreCategorie').value = categorie.id;
+            updateTimbreSelect();
+        }
+
         // Pas de timbre disponible, on garde le champ vide pour saisie manuelle
         document.getElementById('timbreInfo').textContent = '(aucun timbre disponible)';
         document.getElementById('timbreInfo').style.color = 'var(--accent-orange)';

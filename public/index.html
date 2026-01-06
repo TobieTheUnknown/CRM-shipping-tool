@@ -555,12 +555,24 @@
                     <div class="form-group">
                         <label>N° de Suivi <span id="timbreInfo" style="font-size: 11px; color: var(--accent-green);"></span></label>
                         <input type="hidden" id="selectedTimbreId">
-                        <div style="display: flex; gap: 8px; align-items: center;">
-                            <input type="text" id="colisNumeroSuivi" placeholder="Auto-généré si vide" oninput="updateLienSuiviPreview()" style="flex: 1;">
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <select id="colisTimbreCategorie" onchange="updateTimbreSelect()" style="width: 140px;">
+                                <option value="">Catégorie...</option>
+                                <option value="0-20">Moins de 20g</option>
+                                <option value="21-100">21g - 100g</option>
+                                <option value="101-250">101g - 250g</option>
+                                <option value="251-500">251g - 500g</option>
+                                <option value="501-1000">501g - 1kg</option>
+                                <option value="1001-2000">1kg - 2kg</option>
+                            </select>
+                            <select id="colisTimbreSelect" onchange="selectTimbreFromDropdown()" style="flex: 1; min-width: 150px;">
+                                <option value="">Sélectionner un timbre...</option>
+                            </select>
                             <a id="lienSuiviBtn" href="#" target="_blank" class="btn btn-secondary btn-small" style="display: none; white-space: nowrap;">
                                 🔗 Suivre
                             </a>
                         </div>
+                        <input type="text" id="colisNumeroSuivi" placeholder="Ou saisir manuellement..." oninput="updateLienSuiviPreview()" style="margin-top: 8px;">
                     </div>
                 </div>
 

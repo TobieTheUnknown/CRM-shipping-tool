@@ -814,6 +814,40 @@ app.put('/api/timbres/:id/liberer', (req, res) => {
   }
 });
 
+// Toggle stamp status (used/not used)
+app.put('/api/timbres/:id/toggle', (req, res) => {
+  try {
+    // Get current status
+    const timbre = db.prepare('SELECT utilise FROM timbres WHERE id = ?').get(req.params.id);
+    if (!timbre) {
+      return res.status(404).json({ error: 'Timbre non trouvé' });
+    }
+
+    const newStatus = timbre.utilise ? 0 : 1;
+    const result = db.prepare(
+      `UPDATE timbres SET utilise = ?, colis_id = NULL WHERE id = ?`
+    ).run(newStatus, req.params.id);
+
+    res.json({ message: newStatus ? 'Timbre marqué comme utilisé' : 'Timbre marqué comme disponible', utilise: newStatus, changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get stamps by weight category
+app.get('/api/timbres/categorie/:categorie', (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT * FROM timbres
+      WHERE poids_categorie = ?
+      ORDER BY utilise ASC, date_creation DESC
+    `).all(req.params.categorie);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Delete stamp
 app.delete('/api/timbres/:id', (req, res) => {
   try {
