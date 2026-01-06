@@ -1,9 +1,6 @@
 # ShipTrack CRM - Docker pour Synology NAS
 FROM node:20-alpine
 
-# Créer un utilisateur non-root pour la sécurité
-RUN addgroup -g 1000 crm && adduser -u 1000 -G crm -s /bin/sh -D crm
-
 WORKDIR /app
 
 # Copier les fichiers de dépendances
@@ -19,7 +16,7 @@ COPY init-test-data.js ./
 COPY public/ ./public/
 
 # Créer le dossier de données
-RUN mkdir -p /data && chown -R crm:crm /data /app
+RUN mkdir -p /data
 
 # Variables d'environnement
 ENV NODE_ENV=production
@@ -28,9 +25,6 @@ ENV DATA_PATH=/data
 
 # Exposer le port
 EXPOSE 6389
-
-# Passer à l'utilisateur non-root
-USER crm
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
