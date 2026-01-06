@@ -1,12 +1,18 @@
+# Dependencies
 node_modules/
+
+# Database
 *.db
-*.log
-.env
-.DS_Store
+
+# Uploads
 uploads/
-.npm-cache/
-dist/
-*.dmg
-*.exe
-*.AppImage
-*.deb
+
+# Logs
+*.log
+
+# Environment
+.env
+
+# OS files
+.DS_Store
+Thumbs.db

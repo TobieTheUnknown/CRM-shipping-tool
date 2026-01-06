@@ -23,18 +23,18 @@ RUN mkdir -p /data && chown -R crm:crm /data /app
 
 # Variables d'environnement
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=6389
 ENV DATA_PATH=/data
 
 # Exposer le port
-EXPOSE 3000
+EXPOSE 6389
 
 # Passer à l'utilisateur non-root
 USER crm
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/stats || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:6389/api/stats || exit 1
 
 # Démarrer le serveur
 CMD ["node", "server.js"]
