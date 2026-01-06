@@ -346,20 +346,28 @@ app.post('/api/colis', (req, res) => {
 
     const colisId = result.lastInsertRowid;
 
+    const produitsNegatifs = [];
+
     if (produits && produits.length > 0) {
       const stmtInsert = db.prepare('INSERT INTO colis_produits (colis_id, produit_id, quantite, lien) VALUES (?, ?, ?, ?)');
-      const stmtUpdateStock = db.prepare('UPDATE produits SET stock = stock - ? WHERE id = ? AND stock >= ?');
+      const stmtUpdateStock = db.prepare('UPDATE produits SET stock = stock - ? WHERE id = ?');
+      const stmtGetStock = db.prepare('SELECT nom, stock FROM produits WHERE id = ?');
 
       produits.forEach(p => {
         const quantite = p.quantite || 1;
         // Insérer la relation colis-produit avec lien
         stmtInsert.run(colisId, p.produit_id, quantite, p.lien || null);
-        // Décrémenter le stock
-        stmtUpdateStock.run(quantite, p.produit_id, quantite);
+        // Décrémenter le stock (peut devenir négatif)
+        stmtUpdateStock.run(quantite, p.produit_id);
+        // Vérifier si le stock est devenu négatif
+        const produit = stmtGetStock.get(p.produit_id);
+        if (produit && produit.stock < 0) {
+          produitsNegatifs.push({ nom: produit.nom, stock: produit.stock });
+        }
       });
     }
 
-    res.json({ id: colisId, numero_suivi: tracking, message: 'Colis créé avec succès' });
+    res.json({ id: colisId, numero_suivi: tracking, message: 'Colis créé avec succès', produitsNegatifs });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -371,6 +379,8 @@ app.put('/api/colis/:id', (req, res) => {
     adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
     date_expedition, date_livraison, notes, produits
   } = req.body;
+
+  const produitsNegatifs = [];
 
   try {
     // Si des produits sont fournis, gérer le stock
@@ -392,12 +402,18 @@ app.put('/api/colis/:id', (req, res) => {
       // Ajouter les nouveaux produits et décrémenter le stock
       if (produits && produits.length > 0) {
         const stmtInsert = db.prepare('INSERT INTO colis_produits (colis_id, produit_id, quantite, lien) VALUES (?, ?, ?, ?)');
-        const stmtUpdateStock = db.prepare('UPDATE produits SET stock = stock - ? WHERE id = ? AND stock >= ?');
+        const stmtUpdateStock = db.prepare('UPDATE produits SET stock = stock - ? WHERE id = ?');
+        const stmtGetStock = db.prepare('SELECT nom, stock FROM produits WHERE id = ?');
 
         produits.forEach(p => {
           const quantite = p.quantite || 1;
           stmtInsert.run(req.params.id, p.produit_id, quantite, p.lien || null);
-          stmtUpdateStock.run(quantite, p.produit_id, quantite);
+          stmtUpdateStock.run(quantite, p.produit_id);
+          // Vérifier si le stock est devenu négatif
+          const produit = stmtGetStock.get(p.produit_id);
+          if (produit && produit.stock < 0) {
+            produitsNegatifs.push({ nom: produit.nom, stock: produit.stock });
+          }
         });
       }
     }
@@ -412,7 +428,7 @@ app.put('/api/colis/:id', (req, res) => {
           adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
           date_expedition, date_livraison, notes, req.params.id);
 
-    res.json({ message: 'Colis mis à jour', changes: result.changes });
+    res.json({ message: 'Colis mis à jour', changes: result.changes, produitsNegatifs });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

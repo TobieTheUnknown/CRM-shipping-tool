@@ -1019,11 +1019,24 @@ async function saveColis(event) {
         });
 
         if (response.ok) {
+            const result = await response.json();
             closeModal('modalColis');
             loadColis();
             loadProduits(); // Recharger les produits pour mettre à jour le stock
             loadStats();
-            alert('Colis enregistré avec succès!');
+
+            // Vérifier si des produits sont en stock négatif
+            if (result.produitsNegatifs && result.produitsNegatifs.length > 0) {
+                let message = 'Colis enregistré avec succès!\n\n';
+                message += '⚠️ ATTENTION - Stocks négatifs:\n\n';
+                result.produitsNegatifs.forEach(p => {
+                    const quantiteManquante = Math.abs(p.stock);
+                    message += `A demander a Martin: Je suis a court de ${p.nom} je dois en envoyer ${quantiteManquante} si tu peux me rajouter ça sur une commande 🙏\n\n`;
+                });
+                alert(message);
+            } else {
+                alert('Colis enregistré avec succès!');
+            }
         }
     } catch (error) {
         console.error('Erreur sauvegarde colis:', error);
@@ -1759,10 +1772,9 @@ function filterProduitsForColis() {
         return;
     }
 
-    // Filtrer les produits avec stock > 0 et qui ne sont pas déjà sélectionnés
+    // Filtrer les produits (on autorise les stocks négatifs)
     const selectedIds = colisProduitsSelection.map(p => p.produit_id);
     const filtered = produits.filter(p => {
-        if (p.stock <= 0) return false;
         const searchStr = `${p.nom} ${p.description || ''}`.toLowerCase();
         return searchStr.includes(searchTerm);
     });
@@ -1803,13 +1815,8 @@ function addProduitFromSearch(produitId) {
     // Vérifier si le produit est déjà dans la liste
     const existing = colisProduitsSelection.find(p => p.produit_id === produitId);
     if (existing) {
-        // Incrémenter la quantité si stock suffisant
-        if (existing.quantite < produit.stock) {
-            existing.quantite++;
-        } else {
-            alert('Stock insuffisant pour ce produit');
-            return;
-        }
+        // Incrémenter la quantité (on autorise les stocks négatifs)
+        existing.quantite++;
     } else {
         // Ajouter le produit
         colisProduitsSelection.push({
@@ -1858,9 +1865,10 @@ function displayColisProduitsSelection() {
     }
 
     container.innerHTML = colisProduitsSelection.map((p, index) => {
-        const stockInfo = p.quantite <= p.stock
-            ? `<span class="stock-ok">Stock OK (${p.stock})</span>`
-            : `<span class="stock-warning">Stock insuffisant!</span>`;
+        const stockApres = p.stock - p.quantite;
+        const stockInfo = stockApres >= 0
+            ? `<span class="stock-ok">Stock: ${p.stock} → ${stockApres}</span>`
+            : `<span class="stock-warning">⚠️ Stock négatif: ${p.stock} → ${stockApres}</span>`;
 
         return `
             <div class="colis-produit-item" data-index="${index}">
@@ -1875,7 +1883,7 @@ function displayColisProduitsSelection() {
                            onchange="updateProduitLien(${index}, this.value)">
                 </div>
                 <div class="colis-produit-quantite">
-                    <input type="number" min="1" max="${p.stock}" value="${p.quantite}"
+                    <input type="number" min="1" value="${p.quantite}"
                            onchange="updateProduitQuantite(${index}, this.value)">
                 </div>
                 <button type="button" class="colis-produit-remove" onclick="removeProduitFromColis(${index})">✕</button>
@@ -1895,8 +1903,7 @@ function updateProduitLien(index, lien) {
 function updateProduitQuantite(index, quantite) {
     if (colisProduitsSelection[index]) {
         const newQty = parseInt(quantite) || 1;
-        const maxStock = colisProduitsSelection[index].stock;
-        colisProduitsSelection[index].quantite = Math.min(newQty, maxStock);
+        colisProduitsSelection[index].quantite = newQty;
         displayColisProduitsSelection();
         calculatePoidsAndDimension();
     }
