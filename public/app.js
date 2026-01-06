@@ -4,8 +4,10 @@ let clients = [];
 let produits = [];
 let colis = [];
 let dimensions = [];
+let timbres = [];
 let selectedColis = new Set();
 let colisProduitsSelection = []; // Produits sélectionnés pour le colis en cours
+let selectedTimbreId = null; // Timbre sélectionné pour le colis en cours
 
 // ============= INITIALISATION =============
 
@@ -16,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadProduits();
     loadColis();
     loadDimensions();
+    loadTimbres();
 });
 
 function initTabs() {
@@ -49,6 +52,7 @@ async function loadStats() {
         // Update sidebar stats
         document.getElementById('statClientsSidebar').textContent = stats.clients || 0;
         document.getElementById('statPrepSidebar').textContent = stats.colisEnPreparation || 0;
+        document.getElementById('statTimbresSidebar').textContent = stats.timbresDisponibles || 0;
     } catch (error) {
         console.error('Erreur chargement stats:', error);
     }
@@ -917,7 +921,12 @@ function showAddColisModal() {
     colisProduitsSelection = [];
     displayColisProduitsSelection();
     updateProduitSelect();
-    document.getElementById('colisPoidsTotalInfo').style.display = 'none';
+    // Réinitialiser la sélection de timbre
+    selectedTimbreId = null;
+    document.getElementById('selectedTimbreId').value = '';
+    document.getElementById('timbreInfo').textContent = '';
+    document.getElementById('timbreInfo').style.color = 'var(--accent-green)';
+    document.getElementById('lienSuiviBtn').style.display = 'none';
     document.getElementById('modalColis').classList.add('active');
 }
 
@@ -970,12 +979,11 @@ function editColis(id) {
     displayColisProduitsSelection();
     updateProduitSelect();
 
-    if (c.poids) {
-        document.getElementById('colisPoidsTotalValue').textContent = c.poids;
-        document.getElementById('colisPoidsTotalInfo').style.display = 'block';
-    } else {
-        document.getElementById('colisPoidsTotalInfo').style.display = 'none';
-    }
+    // Pour édition, pas de timbre auto-sélectionné mais on affiche le lien si existe
+    selectedTimbreId = null;
+    document.getElementById('selectedTimbreId').value = '';
+    document.getElementById('timbreInfo').textContent = '';
+    updateLienSuiviPreview();
 
     document.getElementById('modalColis').classList.add('active');
 }
@@ -1020,6 +1028,13 @@ async function saveColis(event) {
 
         if (response.ok) {
             const result = await response.json();
+
+            // Si nouveau colis et timbre sélectionné, le marquer comme utilisé
+            const timbreId = document.getElementById('selectedTimbreId').value;
+            if (!id && timbreId && result.id) {
+                await markTimbreAsUsed(timbreId, result.id);
+            }
+
             closeModal('modalColis');
             loadColis();
             loadProduits(); // Recharger les produits pour mettre à jour le stock
@@ -1918,13 +1933,6 @@ function removeProduitFromColis(index) {
 
 // Calculer le poids total et sélectionner la bonne dimension
 function calculatePoidsAndDimension() {
-    if (colisProduitsSelection.length === 0) {
-        document.getElementById('colisPoids').value = '';
-        document.getElementById('colisDimensions').value = '';
-        document.getElementById('colisPoidsTotalInfo').style.display = 'none';
-        return;
-    }
-
     // Trouver la plus grande dimension parmi les produits
     let maxDimensionId = null;
     let maxVolume = 0;
@@ -1943,50 +1951,55 @@ function calculatePoidsAndDimension() {
     });
 
     // Si on a trouvé une dimension, l'utiliser
-    let poidsCarton = 0;
     if (maxDimensionId) {
         const selectedDim = dimensions.find(d => d.id === maxDimensionId);
         if (selectedDim) {
             document.getElementById('colisDimensions').value = `${selectedDim.longueur}x${selectedDim.largeur}x${selectedDim.hauteur}cm`;
-            poidsCarton = selectedDim.poids_carton || 0;
         }
     }
 
-    // Calculer le poids total des produits
+    // Calculer et mettre à jour le poids
+    updatePoidsTotal();
+}
+
+// Calculer le poids total (produits + carton actuel)
+function updatePoidsTotal() {
+    // Calculer le poids des produits
     let poidsProduits = 0;
     colisProduitsSelection.forEach(p => {
         poidsProduits += (p.poids || 0) * p.quantite;
     });
 
-    const poidsTotal = poidsProduits + poidsCarton;
-    document.getElementById('colisPoids').value = poidsTotal.toFixed(2);
+    // Récupérer le poids du carton actuel depuis les dimensions sélectionnées
+    let poidsCarton = 0;
+    const dimensionsValue = document.getElementById('colisDimensions').value;
+    if (dimensionsValue) {
+        const dimMatch = dimensionsValue.replace('cm', '').split('x').map(parseFloat);
+        if (dimMatch.length === 3) {
+            const matchingDim = dimensions.find(d =>
+                d.longueur === dimMatch[0] && d.largeur === dimMatch[1] && d.hauteur === dimMatch[2]
+            );
+            if (matchingDim) {
+                poidsCarton = matchingDim.poids_carton || 0;
+            }
+        }
+    }
 
-    // Afficher l'info du poids total
-    document.getElementById('colisPoidsTotalValue').textContent = poidsTotal.toFixed(2);
-    document.getElementById('colisPoidsTotalInfo').style.display = 'block';
+    const poidsTotal = poidsProduits + poidsCarton;
+    document.getElementById('colisPoids').value = poidsTotal > 0 ? poidsTotal.toFixed(2) : '';
+
+    // Auto-sélectionner un timbre si disponible (seulement pour nouveau colis)
+    const colisId = document.getElementById('colisId').value;
+    if (!colisId && poidsTotal > 0) {
+        autoSelectTimbre();
+    }
 }
 
 // Sélection manuelle d'une dimension (boutons)
 function setDimension(dimension) {
     document.getElementById('colisDimensions').value = dimension + 'cm';
-
-    // Recalculer le poids avec le poids du carton
-    const dimParts = dimension.split('x').map(parseFloat);
-    if (dimParts.length === 3) {
-        const matchingDim = dimensions.find(d =>
-            d.longueur === dimParts[0] && d.largeur === dimParts[1] && d.hauteur === dimParts[2]
-        );
-        if (matchingDim && colisProduitsSelection.length > 0) {
-            let poidsProduits = 0;
-            colisProduitsSelection.forEach(p => {
-                poidsProduits += (p.poids || 0) * p.quantite;
-            });
-            const poidsTotal = poidsProduits + (matchingDim.poids_carton || 0);
-            document.getElementById('colisPoids').value = poidsTotal.toFixed(2);
-            document.getElementById('colisPoidsTotalValue').textContent = poidsTotal.toFixed(2);
-            document.getElementById('colisPoidsTotalInfo').style.display = 'block';
-        }
-    }
+    // Recalculer le poids avec le nouveau carton
+    updatePoidsTotal();
 }
 
 // ============= MODAL PRODUITS DU COLIS =============
@@ -2071,4 +2084,301 @@ function handleProduitClick(colisId) {
 
     // Toujours ouvrir le modal pour afficher les détails
     showColisProduitsModal(colisId);
+}
+
+// ============= TIMBRES =============
+
+const POIDS_CATEGORIES = [
+    { id: '0-20', label: 'Moins de 20g', min: 0, max: 20 },
+    { id: '21-100', label: '21g - 100g', min: 21, max: 100 },
+    { id: '101-250', label: '101g - 250g', min: 101, max: 250 },
+    { id: '251-500', label: '251g - 500g', min: 251, max: 500 },
+    { id: '501-1000', label: '501g - 1kg', min: 501, max: 1000 },
+    { id: '1001-2000', label: '1kg - 2kg', min: 1001, max: 2000 }
+];
+
+async function loadTimbres() {
+    try {
+        const response = await fetch(`${API_URL}/api/timbres`);
+        timbres = await response.json();
+        displayTimbres();
+    } catch (error) {
+        console.error('Erreur chargement timbres:', error);
+    }
+}
+
+function displayTimbres() {
+    const container = document.getElementById('timbresListContainer');
+    if (!container) return;
+
+    // Grouper les timbres par catégorie
+    const grouped = {};
+    POIDS_CATEGORIES.forEach(cat => {
+        grouped[cat.id] = {
+            label: cat.label,
+            disponibles: [],
+            utilises: []
+        };
+    });
+
+    timbres.forEach(t => {
+        const catId = t.poids_categorie;
+        if (grouped[catId]) {
+            if (t.utilise) {
+                grouped[catId].utilises.push(t);
+            } else {
+                grouped[catId].disponibles.push(t);
+            }
+        }
+    });
+
+    let html = '';
+    POIDS_CATEGORIES.forEach(cat => {
+        const data = grouped[cat.id];
+        const total = data.disponibles.length + data.utilises.length;
+
+        if (total === 0) {
+            html += `
+                <div class="colis-section">
+                    <div class="section-title">
+                        <span>🎫 ${cat.label}</span>
+                        <span style="color: var(--text-muted);">Aucun timbre</span>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        html += `
+            <div class="colis-section">
+                <div class="section-title collapsible" onclick="toggleSection(this)">
+                    <span>🎫 ${cat.label} - ${data.disponibles.length} disponible(s) / ${total} total</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>N° Suivi</th>
+                                <th>Lien de suivi</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        // D'abord les disponibles
+        data.disponibles.forEach(t => {
+            const lien = `https://www.laposte.fr/outils/suivre-vos-envois?code=${t.numero_suivi}`;
+            html += `
+                <tr>
+                    <td><code style="font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan);">${t.numero_suivi}</code></td>
+                    <td><a href="${lien}" target="_blank" class="product-link">🔗 Suivre</a></td>
+                    <td><span class="badge badge-envoye">Disponible</span></td>
+                    <td class="actions">
+                        <button class="btn btn-danger btn-small" onclick="deleteTimbre(${t.id})">🗑️</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        // Puis les utilisés
+        data.utilises.forEach(t => {
+            const lien = `https://www.laposte.fr/outils/suivre-vos-envois?code=${t.numero_suivi}`;
+            html += `
+                <tr style="opacity: 0.6;">
+                    <td><code style="font-family: 'JetBrains Mono', monospace;">${t.numero_suivi}</code></td>
+                    <td><a href="${lien}" target="_blank" class="product-link">🔗 Suivre</a></td>
+                    <td><span class="badge badge-preparation">Utilisé${t.colis_numero_suivi ? ' - ' + t.colis_numero_suivi : ''}</span></td>
+                    <td class="actions">
+                        <button class="btn btn-secondary btn-small" onclick="libererTimbre(${t.id})">↩️ Libérer</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 10px;">
+                    <button class="btn btn-danger btn-small" onclick="deleteTimbreCategorie('${cat.id}')">
+                        🗑️ Supprimer tous les disponibles (${data.disponibles.length})
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+async function importTimbres() {
+    const text = document.getElementById('timbresImportText').value;
+    const select = document.getElementById('timbrePoidsCategorie');
+    const selectedOption = select.options[select.selectedIndex];
+
+    const poids_categorie = select.value;
+    const poids_min = parseFloat(selectedOption.dataset.min);
+    const poids_max = parseFloat(selectedOption.dataset.max);
+
+    // Extraire les numéros après "SD:" et ignorer les doublons
+    const regex = /SD:\s*([A-Za-z0-9]+)/gi;
+    const matches = text.matchAll(regex);
+    const numerosSet = new Set();
+
+    for (const match of matches) {
+        numerosSet.add(match[1].trim());
+    }
+
+    const numeros = Array.from(numerosSet);
+
+    if (numeros.length === 0) {
+        alert('Aucun numéro de suivi trouvé dans le texte. Format attendu: "SD: XXXXX"');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/timbres/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ numeros, poids_categorie, poids_min, poids_max })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            alert(`${result.inserted} timbre(s) importé(s) sur ${result.total} trouvé(s)`);
+            document.getElementById('timbresImportText').value = '';
+            loadTimbres();
+            loadStats();
+        } else {
+            alert('Erreur: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Erreur import timbres:', error);
+        alert('Erreur lors de l\'import');
+    }
+}
+
+async function deleteTimbre(id) {
+    if (!confirm('Supprimer ce timbre ?')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/timbres/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+            loadTimbres();
+            loadStats();
+        }
+    } catch (error) {
+        console.error('Erreur suppression timbre:', error);
+    }
+}
+
+async function deleteTimbreCategorie(categorie) {
+    if (!confirm('Supprimer tous les timbres disponibles de cette catégorie ?')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/timbres/categorie/${encodeURIComponent(categorie)}`, { method: 'DELETE' });
+        if (response.ok) {
+            const result = await response.json();
+            alert(`${result.changes} timbre(s) supprimé(s)`);
+            loadTimbres();
+            loadStats();
+        }
+    } catch (error) {
+        console.error('Erreur suppression timbres:', error);
+    }
+}
+
+async function libererTimbre(id) {
+    if (!confirm('Libérer ce timbre ? Il sera de nouveau disponible.')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/timbres/${id}/liberer`, { method: 'PUT' });
+        if (response.ok) {
+            loadTimbres();
+            loadStats();
+        }
+    } catch (error) {
+        console.error('Erreur libération timbre:', error);
+    }
+}
+
+// Rechercher un timbre disponible pour un poids donné (en kg)
+async function findTimbreForPoids(poidsKg) {
+    if (!poidsKg || poidsKg <= 0) return null;
+
+    try {
+        const response = await fetch(`${API_URL}/api/timbres/disponible/${poidsKg}`);
+        const timbre = await response.json();
+        return timbre;
+    } catch (error) {
+        console.error('Erreur recherche timbre:', error);
+        return null;
+    }
+}
+
+// Générer le lien de suivi La Poste
+function getLienSuivi(numeroSuivi) {
+    if (!numeroSuivi) return '';
+    return `https://www.laposte.fr/outils/suivre-vos-envois?code=${numeroSuivi}`;
+}
+
+// Mettre à jour l'aperçu du lien de suivi
+function updateLienSuiviPreview() {
+    const numero = document.getElementById('colisNumeroSuivi').value.trim();
+    const btn = document.getElementById('lienSuiviBtn');
+
+    if (numero) {
+        const lien = getLienSuivi(numero);
+        btn.href = lien;
+        btn.style.display = 'inline-flex';
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+// Sélectionner automatiquement un timbre basé sur le poids
+async function autoSelectTimbre() {
+    const poidsValue = document.getElementById('colisPoids').value;
+    const poids = parseFloat(poidsValue);
+
+    // Reset
+    document.getElementById('selectedTimbreId').value = '';
+    document.getElementById('timbreInfo').textContent = '';
+    selectedTimbreId = null;
+
+    if (!poids || poids <= 0) return;
+
+    const timbre = await findTimbreForPoids(poids);
+
+    if (timbre) {
+        selectedTimbreId = timbre.id;
+        document.getElementById('selectedTimbreId').value = timbre.id;
+        document.getElementById('colisNumeroSuivi').value = timbre.numero_suivi;
+        document.getElementById('timbreInfo').textContent = '(timbre auto-sélectionné)';
+        updateLienSuiviPreview();
+    } else {
+        // Pas de timbre disponible, on garde le champ vide pour saisie manuelle
+        document.getElementById('timbreInfo').textContent = '(aucun timbre disponible)';
+        document.getElementById('timbreInfo').style.color = 'var(--accent-orange)';
+    }
+}
+
+// Marquer le timbre comme utilisé après sauvegarde du colis
+async function markTimbreAsUsed(timbreId, colisId) {
+    if (!timbreId) return;
+
+    try {
+        await fetch(`${API_URL}/api/timbres/${timbreId}/utiliser`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ colis_id: colisId })
+        });
+        loadTimbres();
+        loadStats();
+    } catch (error) {
+        console.error('Erreur marquage timbre:', error);
+    }
 }
