@@ -280,7 +280,7 @@ app.get('/api/colis', (req, res) => {
 
     // Récupérer TOUS les produits de TOUS les colis en UNE SEULE requête (fix N+1)
     const allProduits = db.prepare(`
-      SELECT cp.colis_id, cp.produit_id, cp.quantite, p.nom, p.poids, p.dimension_id
+      SELECT cp.colis_id, cp.produit_id, cp.quantite, cp.lien, p.nom, p.poids, p.dimension_id
       FROM colis_produits cp
       LEFT JOIN produits p ON cp.produit_id = p.id
     `).all();
