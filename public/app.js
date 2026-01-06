@@ -2473,19 +2473,36 @@ function updateLienSuiviPreview() {
 
 // Mettre à jour le sélecteur de timbres en fonction de la catégorie
 function updateTimbreSelect() {
-    const categorie = document.getElementById('colisTimbreCategorie').value;
+    const categorieSelect = document.getElementById('colisTimbreCategorie');
     const select = document.getElementById('colisTimbreSelect');
 
     // Reset
     select.innerHTML = '<option value="">Sélectionner un timbre...</option>';
 
+    const categorie = categorieSelect.value;
     if (!categorie) return;
 
-    console.log('Catégorie sélectionnée:', categorie);
-    console.log('Timbres disponibles:', timbres.filter(t => !t.utilise).map(t => ({ id: t.id, cat: t.poids_categorie })));
+    // Récupérer les poids min/max de la catégorie sélectionnée
+    const selectedOption = categorieSelect.options[categorieSelect.selectedIndex];
+    const catPoidsMin = parseFloat(selectedOption.dataset.min) || 0;
+    const catPoidsMax = parseFloat(selectedOption.dataset.max) || Infinity;
+
+    console.log('Catégorie sélectionnée:', categorie, 'poids:', catPoidsMin, '-', catPoidsMax);
+    console.log('Tous les timbres disponibles:', timbres.filter(t => !t.utilise).map(t => ({
+        id: t.id,
+        cat: t.poids_categorie,
+        min: t.poids_min,
+        max: t.poids_max
+    })));
 
     // Filtrer les timbres disponibles de cette catégorie
-    const timbresDisponibles = timbres.filter(t => t.poids_categorie === categorie && !t.utilise);
+    // On compare soit par nom de catégorie, soit par plage de poids
+    const timbresDisponibles = timbres.filter(t => {
+        if (t.utilise) return false;
+        // Match par nom de catégorie OU par plage de poids
+        return t.poids_categorie === categorie ||
+               (t.poids_min === catPoidsMin && t.poids_max === catPoidsMax);
+    });
 
     if (timbresDisponibles.length === 0) {
         select.innerHTML = '<option value="">Aucun timbre disponible</option>';
@@ -2729,6 +2746,8 @@ function cancelTimbreCategorieEdit() {
 
 // Mettre à jour tous les selects de catégories de timbres
 function updateAllTimbreCategorieSelects() {
+    console.log('updateAllTimbreCategorieSelects appelée avec', timbreCategories.length, 'catégories');
+
     // Select dans la page Timbres (import)
     const importSelect = document.getElementById('timbrePoidsCategorie');
     if (importSelect) {
@@ -2740,9 +2759,13 @@ function updateAllTimbreCategorieSelects() {
     // Select dans le modal colis
     const colisSelect = document.getElementById('colisTimbreCategorie');
     if (colisSelect) {
-        colisSelect.innerHTML = '<option value="">Catégorie...</option>' + timbreCategories.map(cat =>
+        const newOptions = '<option value="">Catégorie...</option>' + timbreCategories.map(cat =>
             `<option value="${cat.nom}" data-min="${cat.poids_min}" data-max="${cat.poids_max}">${cat.nom}</option>`
         ).join('');
+        colisSelect.innerHTML = newOptions;
+        console.log('Options du dropdown catégorie mis à jour:', colisSelect.innerHTML.substring(0, 200));
+    } else {
+        console.warn('colisTimbreCategorie non trouvé!');
     }
 
     // Select dans le modal d'édition de timbre
