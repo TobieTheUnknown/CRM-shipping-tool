@@ -424,7 +424,7 @@ app.put('/api/colis/:id', (req, res) => {
            adresse_expedition=?, adresse_ligne2=?, ville_expedition=?, code_postal_expedition=?, pays_expedition=?,
            date_expedition=?, date_livraison=?, notes=?
        WHERE id=?`
-    ).run(client_id, numero_suivi, statut, poids, dimensions, reference,
+    ).run(client_id, numero_suivi || null, statut, poids, dimensions, reference,
           adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
           date_expedition, date_livraison, notes, req.params.id);
 
