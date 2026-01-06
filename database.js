@@ -75,9 +75,13 @@ function initDatabase() {
     colis_id INTEGER NOT NULL,
     produit_id INTEGER NOT NULL,
     quantite INTEGER DEFAULT 1,
+    lien TEXT,
     FOREIGN KEY (colis_id) REFERENCES colis (id) ON DELETE CASCADE,
     FOREIGN KEY (produit_id) REFERENCES produits (id)
   )`);
+
+  // Migration: ajouter lien si manquant
+  try { db.exec(`ALTER TABLE colis_produits ADD COLUMN lien TEXT`); } catch (err) {}
 
   // Table Dimensions de cartons
   db.exec(`CREATE TABLE IF NOT EXISTS dimensions (
@@ -86,9 +90,13 @@ function initDatabase() {
     longueur REAL NOT NULL,
     largeur REAL NOT NULL,
     hauteur REAL NOT NULL,
+    poids_carton REAL DEFAULT 0,
     is_default INTEGER DEFAULT 0,
     date_creation DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  // Migration: ajouter poids_carton si manquant
+  try { db.exec(`ALTER TABLE dimensions ADD COLUMN poids_carton REAL DEFAULT 0`); } catch (err) {}
 
   try { db.exec(`ALTER TABLE produits ADD COLUMN dimension_id INTEGER REFERENCES dimensions(id)`); } catch (err) {}
 

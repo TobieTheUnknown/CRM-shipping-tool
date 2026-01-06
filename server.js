@@ -277,6 +277,19 @@ app.get('/api/colis', (req, res) => {
       LEFT JOIN clients cl ON c.client_id = cl.id
       ORDER BY c.date_creation DESC
     `).all();
+
+    // Récupérer les produits pour chaque colis
+    const stmtProduits = db.prepare(`
+      SELECT cp.*, p.nom, p.poids, p.dimension_id
+      FROM colis_produits cp
+      LEFT JOIN produits p ON cp.produit_id = p.id
+      WHERE cp.colis_id = ?
+    `);
+
+    rows.forEach(colis => {
+      colis.produits = stmtProduits.all(colis.id);
+    });
+
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -299,7 +312,7 @@ app.get('/api/colis/:id', (req, res) => {
     `).get(req.params.id);
 
     const produits = db.prepare(
-      `SELECT cp.*, p.nom, p.description, p.prix
+      `SELECT cp.*, p.nom, p.description, p.prix, p.poids, p.dimension_id
        FROM colis_produits cp
        LEFT JOIN produits p ON cp.produit_id = p.id
        WHERE cp.colis_id = ?`
@@ -334,9 +347,15 @@ app.post('/api/colis', (req, res) => {
     const colisId = result.lastInsertRowid;
 
     if (produits && produits.length > 0) {
-      const stmt = db.prepare('INSERT INTO colis_produits (colis_id, produit_id, quantite) VALUES (?, ?, ?)');
+      const stmtInsert = db.prepare('INSERT INTO colis_produits (colis_id, produit_id, quantite, lien) VALUES (?, ?, ?, ?)');
+      const stmtUpdateStock = db.prepare('UPDATE produits SET stock = stock - ? WHERE id = ? AND stock >= ?');
+
       produits.forEach(p => {
-        stmt.run(colisId, p.produit_id, p.quantite || 1);
+        const quantite = p.quantite || 1;
+        // Insérer la relation colis-produit avec lien
+        stmtInsert.run(colisId, p.produit_id, quantite, p.lien || null);
+        // Décrémenter le stock
+        stmtUpdateStock.run(quantite, p.produit_id, quantite);
       });
     }
 
@@ -350,10 +369,39 @@ app.put('/api/colis/:id', (req, res) => {
   const {
     client_id, numero_suivi, statut, poids, dimensions, reference,
     adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
-    date_expedition, date_livraison, notes
+    date_expedition, date_livraison, notes, produits
   } = req.body;
 
   try {
+    // Si des produits sont fournis, gérer le stock
+    if (produits !== undefined) {
+      // Récupérer les anciens produits pour restaurer le stock
+      const anciensProduits = db.prepare(
+        'SELECT produit_id, quantite FROM colis_produits WHERE colis_id = ?'
+      ).all(req.params.id);
+
+      // Restaurer le stock des anciens produits
+      const stmtRestore = db.prepare('UPDATE produits SET stock = stock + ? WHERE id = ?');
+      anciensProduits.forEach(p => {
+        stmtRestore.run(p.quantite, p.produit_id);
+      });
+
+      // Supprimer les anciennes relations
+      db.prepare('DELETE FROM colis_produits WHERE colis_id = ?').run(req.params.id);
+
+      // Ajouter les nouveaux produits et décrémenter le stock
+      if (produits && produits.length > 0) {
+        const stmtInsert = db.prepare('INSERT INTO colis_produits (colis_id, produit_id, quantite, lien) VALUES (?, ?, ?, ?)');
+        const stmtUpdateStock = db.prepare('UPDATE produits SET stock = stock - ? WHERE id = ? AND stock >= ?');
+
+        produits.forEach(p => {
+          const quantite = p.quantite || 1;
+          stmtInsert.run(req.params.id, p.produit_id, quantite, p.lien || null);
+          stmtUpdateStock.run(quantite, p.produit_id, quantite);
+        });
+      }
+    }
+
     const result = db.prepare(
       `UPDATE colis
        SET client_id=?, numero_suivi=?, statut=?, poids=?, dimensions=?, reference=?,
@@ -372,6 +420,17 @@ app.put('/api/colis/:id', (req, res) => {
 
 app.delete('/api/colis/:id', (req, res) => {
   try {
+    // Restaurer le stock des produits avant de supprimer le colis
+    const produitsAColis = db.prepare(
+      'SELECT produit_id, quantite FROM colis_produits WHERE colis_id = ?'
+    ).all(req.params.id);
+
+    const stmtRestore = db.prepare('UPDATE produits SET stock = stock + ? WHERE id = ?');
+    produitsAColis.forEach(p => {
+      stmtRestore.run(p.quantite, p.produit_id);
+    });
+
+    // Les relations colis_produits seront supprimées automatiquement grâce à ON DELETE CASCADE
     const result = db.prepare('DELETE FROM colis WHERE id = ?').run(req.params.id);
     res.json({ message: 'Colis supprimé', changes: result.changes });
   } catch (err) {
@@ -609,13 +668,13 @@ app.get('/api/dimensions', (req, res) => {
 });
 
 app.post('/api/dimensions', (req, res) => {
-  const { nom, longueur, largeur, hauteur, is_default } = req.body;
+  const { nom, longueur, largeur, hauteur, poids_carton, is_default } = req.body;
 
   try {
     const result = db.prepare(
-      `INSERT INTO dimensions (nom, longueur, largeur, hauteur, is_default)
-       VALUES (?, ?, ?, ?, ?)`
-    ).run(nom, longueur, largeur, hauteur, is_default ? 1 : 0);
+      `INSERT INTO dimensions (nom, longueur, largeur, hauteur, poids_carton, is_default)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(nom, longueur, largeur, hauteur, poids_carton || 0, is_default ? 1 : 0);
 
     res.json({ id: result.lastInsertRowid, message: 'Dimension créée avec succès' });
   } catch (err) {
@@ -624,14 +683,14 @@ app.post('/api/dimensions', (req, res) => {
 });
 
 app.put('/api/dimensions/:id', (req, res) => {
-  const { nom, longueur, largeur, hauteur, is_default } = req.body;
+  const { nom, longueur, largeur, hauteur, poids_carton, is_default } = req.body;
 
   try {
     const result = db.prepare(
       `UPDATE dimensions
-       SET nom=?, longueur=?, largeur=?, hauteur=?, is_default=?
+       SET nom=?, longueur=?, largeur=?, hauteur=?, poids_carton=?, is_default=?
        WHERE id=?`
-    ).run(nom, longueur, largeur, hauteur, is_default ? 1 : 0, req.params.id);
+    ).run(nom, longueur, largeur, hauteur, poids_carton || 0, is_default ? 1 : 0, req.params.id);
 
     res.json({ message: 'Dimension mise à jour', changes: result.changes });
   } catch (err) {

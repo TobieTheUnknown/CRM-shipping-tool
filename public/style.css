@@ -1176,6 +1176,195 @@ input[type="checkbox"] {
     font-size: 14px;
 }
 
+/* Colis Produits Container */
+.colis-produits-container {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    min-height: 60px;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.colis-produit-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    transition: all 0.3s;
+}
+
+.colis-produit-item:last-child {
+    margin-bottom: 0;
+}
+
+.colis-produit-item:hover {
+    border-color: var(--accent-cyan);
+}
+
+.colis-produit-info {
+    flex: 1;
+}
+
+.colis-produit-nom {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.colis-produit-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.colis-produit-lien {
+    flex: 1;
+}
+
+.colis-produit-lien input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.colis-produit-lien input:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+}
+
+.colis-produit-quantite {
+    width: 70px;
+}
+
+.colis-produit-quantite input {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--text-primary);
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.colis-produit-remove {
+    padding: 6px 10px;
+    background: rgba(248, 113, 113, 0.1);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    border-radius: 4px;
+    color: var(--accent-red);
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 14px;
+}
+
+.colis-produit-remove:hover {
+    background: var(--accent-red);
+    color: #fff;
+}
+
+.colis-produits-empty {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+/* Produits List Modal */
+.produits-list-modal {
+    margin: 20px 0;
+}
+
+.produit-modal-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    transition: all 0.3s;
+}
+
+.produit-modal-item:hover {
+    border-color: var(--accent-cyan);
+}
+
+.produit-modal-info {
+    flex: 1;
+}
+
+.produit-modal-nom {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.produit-modal-quantite {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.produit-modal-lien a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, var(--accent-cyan), #0099cc);
+    color: #000;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.3s;
+}
+
+.produit-modal-lien a:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 217, 255, 0.4);
+}
+
+.produit-modal-no-link {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* Stock Warning */
+.stock-warning {
+    color: var(--accent-orange);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.stock-ok {
+    color: var(--accent-green);
+    font-size: 11px;
+}
+
+/* Produit cliquable dans la liste des colis */
+.produit-clickable {
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.produit-clickable:hover {
+    color: var(--accent-cyan);
+}
+
 /* Loading Spinner */
 .loading {
     display: inline-block;
