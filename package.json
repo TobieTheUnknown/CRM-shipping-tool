@@ -42,13 +42,24 @@
       "!dist/**",
       "!.git/**",
       "!.github/**",
-      "!*.md"
+      "!*.md",
+      "!Dockerfile",
+      "!docker-compose.yml",
+      "!.dockerignore"
     ],
+    "asar": false,
     "extraResources": [
       {
-        "from": "crm.db",
-        "to": "crm.db",
-        "filter": ["**/*"]
+        "from": ".",
+        "to": "app",
+        "filter": [
+          "server.js",
+          "database.js",
+          "init-test-data.js",
+          "package.json",
+          "public/**/*",
+          "node_modules/**/*"
+        ]
       }
     ],
     "mac": {

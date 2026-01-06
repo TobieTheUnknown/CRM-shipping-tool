@@ -1,8 +1,36 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
-const db = new Database(path.join(__dirname, 'crm.db'));
-console.log('Connecté à la base de données SQLite.');
+// Déterminer le chemin des données
+function getDataPath() {
+  // Docker/Synology: utiliser DATA_PATH env var
+  if (process.env.DATA_PATH) {
+    return process.env.DATA_PATH;
+  }
+
+  // Electron packagé: utiliser resourcesPath
+  if (process.resourcesPath && !process.resourcesPath.includes('node_modules')) {
+    return process.resourcesPath;
+  }
+
+  // Développement: utiliser le dossier courant
+  return __dirname;
+}
+
+const dataPath = getDataPath();
+const dbPath = path.join(dataPath, 'crm.db');
+
+console.log(`📁 Chemin données: ${dataPath}`);
+console.log(`💾 Base de données: ${dbPath}`);
+
+// S'assurer que le dossier existe
+if (!fs.existsSync(dataPath)) {
+  fs.mkdirSync(dataPath, { recursive: true });
+}
+
+const db = new Database(dbPath);
+console.log('✅ Connecté à la base de données SQLite.');
 
 function initDatabase() {
   // Table Clients
@@ -109,12 +137,14 @@ function initDatabase() {
     ];
     const stmt = db.prepare('INSERT INTO dimensions (nom, longueur, largeur, hauteur, is_default) VALUES (?, ?, ?, ?, ?)');
     defaultDimensions.forEach(d => stmt.run(...d));
-    console.log('Dimensions par défaut créées.');
+    console.log('📦 Dimensions par défaut créées.');
   }
 
-  console.log('Tables de base de données initialisées.');
+  console.log('✅ Tables de base de données initialisées.');
 }
 
 initDatabase();
 
+// Exporter aussi le chemin des données pour les autres modules
 module.exports = db;
+module.exports.dataPath = dataPath;

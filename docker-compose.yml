@@ -1,0 +1,27 @@
+# Docker Compose pour Synology NAS
+# Chemin recommandé: /volume1/docker/crm/
+
+version: '3.8'
+
+services:
+  crm:
+    build: .
+    image: shiptrack-crm:latest
+    container_name: shiptrack-crm
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Base de données persistante sur le NAS
+      - /volume1/docker/crm/data:/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_PATH=/data
+      - TZ=Europe/Paris
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
