@@ -674,7 +674,7 @@ function addLienField(value = '') {
     div.id = `container_${id}`;
     div.innerHTML = `
         <div style="display: flex; gap: 10px; align-items: center;">
-            <input type="url" class="lien-input" id="${id}" placeholder="https://..." value="${value}" style="flex: 1;">
+            <input type="text" class="lien-input" id="${id}" placeholder="https://..." value="${value}" style="flex: 1;">
             <button type="button" class="btn btn-danger btn-small" onclick="removeField('container_${id}')">🗑️</button>
         </div>
     `;
@@ -848,24 +848,30 @@ async function loadColis() {
 }
 
 function displayColis() {
-    // Séparer les colis en deux catégories
-    const colisEnAttente = colis.filter(c =>
-        c.statut === 'En préparation' || c.statut === 'Out of stock' || c.statut === 'Incomplet'
-    );
-    const colisExpedies = colis.filter(c =>
-        c.statut === 'Envoyé'
-    );
+    // Séparer les colis en trois catégories
+    const colisEnPreparation = colis.filter(c => c.statut === 'En préparation');
+    const colisProblematiques = colis.filter(c => c.statut === 'Out of stock' || c.statut === 'Incomplet');
+    const colisExpedies = colis.filter(c => c.statut === 'Envoyé');
 
     // Afficher les compteurs
-    document.getElementById('countEnAttente').textContent = colisEnAttente.length;
+    document.getElementById('countEnPreparation').textContent = colisEnPreparation.length;
+    document.getElementById('countProblematiques').textContent = colisProblematiques.length;
     document.getElementById('countExpedies').textContent = colisExpedies.length;
 
-    // Afficher colis en attente
-    const tbodyAttente = document.getElementById('colisEnAttenteBody');
-    if (colisEnAttente.length === 0) {
-        tbodyAttente.innerHTML = '<tr><td colspan="8" class="empty">Aucun colis en attente</td></tr>';
+    // Afficher colis en préparation
+    const tbodyPreparation = document.getElementById('colisEnPreparationBody');
+    if (colisEnPreparation.length === 0) {
+        tbodyPreparation.innerHTML = '<tr><td colspan="8" class="empty">Aucun colis en préparation</td></tr>';
     } else {
-        tbodyAttente.innerHTML = colisEnAttente.map(c => renderColisRow(c, 'attente')).join('');
+        tbodyPreparation.innerHTML = colisEnPreparation.map(c => renderColisRow(c, 'preparation')).join('');
+    }
+
+    // Afficher colis problématiques (Out of stock + Incomplet)
+    const tbodyProblematiques = document.getElementById('colisProblematiquesBody');
+    if (colisProblematiques.length === 0) {
+        tbodyProblematiques.innerHTML = '<tr><td colspan="8" class="empty">Aucun colis problématique</td></tr>';
+    } else {
+        tbodyProblematiques.innerHTML = colisProblematiques.map(c => renderColisRow(c, 'problematiques')).join('');
     }
 
     // Afficher colis expédiés
@@ -942,7 +948,7 @@ function renderColisRow(c, section) {
             <td>${clientHtml}</td>
             <td><span class="badge badge-${getStatutClass(c.statut)}">${c.statut}</span></td>
             <td>${c.poids ? c.poids + ' kg' : '-'}</td>
-            <td><strong>${c.numero_suivi || 'N/A'}</strong></td>
+            <td><strong>${c.numero_suivi || 'XXXX-XXXX'}</strong></td>
             <td class="actions">
                 <button class="btn btn-edit btn-small" onclick="editColis(${c.id})">✏️</button>
                 <button class="btn btn-danger btn-small" onclick="deleteColis(${c.id})">🗑️</button>
@@ -1499,9 +1505,7 @@ async function initTestData() {
             resultDiv.style.display = 'block';
 
             // Rafraîchir les données en parallèle
-            setTimeout(() => {
-                Promise.all([loadStats(), loadClients(), loadProduits(), loadColis()]);
-            }, 500);
+            Promise.all([loadStats(), loadClients(), loadProduits(), loadColis()]);
         } else {
             contentDiv.innerHTML = `
                 <p class="import-error">❌ Erreur</p>
@@ -1614,9 +1618,7 @@ async function resetDatabase() {
             resultDiv.style.display = 'block';
 
             // Rafraîchir les données en parallèle
-            setTimeout(() => {
-                Promise.all([loadStats(), loadClients(), loadProduits(), loadColis()]);
-            }, 500);
+            Promise.all([loadStats(), loadClients(), loadProduits(), loadColis()]);
         } else {
             contentDiv.innerHTML = `
                 <p class="import-error">❌ Erreur</p>
@@ -1972,7 +1974,7 @@ function displayColisProduitsSelection() {
                     </div>
                 </div>
                 <div class="colis-produit-lien">
-                    <input type="url" placeholder="https://..." value="${p.lien || ''}"
+                    <input type="text" placeholder="lien..." value="${p.lien || ''}"
                            onchange="updateProduitLien(${index}, this.value)">
                 </div>
                 <div class="colis-produit-quantite">
@@ -2203,6 +2205,7 @@ function displayTimbres() {
         grouped[cat.nom] = {
             label: cat.nom,
             type: cat.type || 'national',
+            poids_min: cat.poids_min || 0,
             disponibles: [],
             utilises: []
         };
@@ -2215,6 +2218,7 @@ function displayTimbres() {
             grouped[catNom] = {
                 label: catNom,
                 type: 'autre',
+                poids_min: t.poids_min || 0,
                 disponibles: [],
                 utilises: []
             };
@@ -2228,13 +2232,14 @@ function displayTimbres() {
 
     let html = '';
 
-    // Trier les catégories par type puis par nom
+    // Trier les catégories par type puis par poids (petit > gros)
     const sortedCategories = Object.keys(grouped).sort((a, b) => {
         const typeOrder = { national: 0, international: 1, autre: 2 };
         const typeA = typeOrder[grouped[a].type] || 2;
         const typeB = typeOrder[grouped[b].type] || 2;
         if (typeA !== typeB) return typeA - typeB;
-        return a.localeCompare(b);
+        // Trier par poids_min (petit en premier)
+        return (grouped[a].poids_min || 0) - (grouped[b].poids_min || 0);
     });
 
     sortedCategories.forEach(catNom => {

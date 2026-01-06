@@ -121,7 +121,7 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
           if (numeroColisMois) notesComplete += `\nN° Colis/mois: ${numeroColisMois}`;
 
           insertColis.run(
-            lienSuivi || `COL${Date.now()}-${index}`,
+            lienSuivi || null,
             clientId,
             statut,
             poids || null,
@@ -157,7 +157,7 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
 
 app.get('/api/clients', (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM clients ORDER BY date_creation DESC').all();
+    const rows = db.prepare('SELECT * FROM clients ORDER BY nom ASC, prenom ASC').all();
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -341,7 +341,8 @@ app.post('/api/colis', (req, res) => {
     notes, produits
   } = req.body;
 
-  const tracking = numero_suivi || `COL${Date.now()}`;
+  // Ne pas générer de numéro auto - laisser null si non fourni
+  const tracking = numero_suivi || null;
 
   try {
     const result = db.prepare(
@@ -538,7 +539,7 @@ app.post('/api/etiquettes/pdf', (req, res) => {
 
       doc.fontSize(12)
          .font('Helvetica-Bold')
-         .text(colis.numero_suivi || 'N/A', startX + margin, currentY, {
+         .text(colis.numero_suivi || 'XXXX-XXXX', startX + margin, currentY, {
            width: labelWidth - 2 * margin,
            align: 'center'
          });
@@ -546,7 +547,7 @@ app.post('/api/etiquettes/pdf', (req, res) => {
 
       doc.fontSize(9)
          .font('Courier-Bold')
-         .text(`|||  ${colis.numero_suivi || 'N/A'}  |||`, startX + margin, currentY, {
+         .text(`|||  ${colis.numero_suivi || 'XXXX-XXXX'}  |||`, startX + margin, currentY, {
            width: labelWidth - 2 * margin,
            align: 'center'
          });

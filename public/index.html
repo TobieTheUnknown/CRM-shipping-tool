@@ -284,14 +284,14 @@
                     </button>
                 </div>
 
-                <!-- COLIS EN ATTENTE -->
+                <!-- COLIS EN PRÉPARATION -->
                 <div class="colis-section">
-                    <h3 class="section-title">📦 Colis en attente (<span id="countEnAttente">0</span>)</h3>
+                    <h3 class="section-title">📦 En préparation (<span id="countEnPreparation">0</span>)</h3>
                     <div class="table-container">
                         <table class="colisTable">
                             <thead>
                                 <tr>
-                                    <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('attente')"></th>
+                                    <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('preparation')"></th>
                                     <th>Date</th>
                                     <th>Produit</th>
                                     <th>Client / Adresse</th>
@@ -301,8 +301,32 @@
                                     <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="colisEnAttenteBody">
-                                <tr><td colspan="8" class="empty">Aucun colis en attente</td></tr>
+                            <tbody id="colisEnPreparationBody">
+                                <tr><td colspan="8" class="empty">Aucun colis en préparation</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- COLIS PROBLÉMATIQUES (Out of stock / Incomplet) -->
+                <div class="colis-section">
+                    <h3 class="section-title" style="color: var(--accent-orange);">⚠️ Problématiques (<span id="countProblematiques">0</span>)</h3>
+                    <div class="table-container">
+                        <table class="colisTable">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('problematiques')"></th>
+                                    <th>Date</th>
+                                    <th>Produit</th>
+                                    <th>Client / Adresse</th>
+                                    <th>Statut</th>
+                                    <th>Poids</th>
+                                    <th>N° Suivi</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="colisProblematiquesBody">
+                                <tr><td colspan="8" class="empty">Aucun colis problématique</td></tr>
                             </tbody>
                         </table>
                     </div>
