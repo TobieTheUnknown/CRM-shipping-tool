@@ -127,13 +127,13 @@ function displayClients(filteredList = null) {
     }
 
     tbody.innerHTML = listToDisplay.map(client => `
-        <tr>
+        <tr style="cursor: pointer;" onclick="viewClientDetails(${client.id})">
             <td>${client.nom}</td>
             <td>${client.prenom || ''}</td>
             <td>${client.email || ''}</td>
             <td>${client.telephone || ''}</td>
             <td>${client.ville || ''}</td>
-            <td class="actions">
+            <td class="actions" onclick="event.stopPropagation()">
                 <button class="btn btn-edit btn-small" onclick="editClient(${client.id})">✏️ Éditer</button>
                 <button class="btn btn-danger btn-small" onclick="deleteClient(${client.id})">🗑️</button>
             </td>
