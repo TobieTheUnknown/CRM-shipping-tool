@@ -88,33 +88,36 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
         return res.status(400).json({ error: 'Le fichier CSV est vide' });
       }
 
-      // Prepared statements
-      const findClientByEmail = db.prepare("SELECT id FROM clients WHERE email = ? AND email IS NOT NULL AND email != ''");
-      const findClientByName = db.prepare('SELECT id FROM clients WHERE nom = ? AND prenom = ?');
-      const insertClient = db.prepare(
-        `INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, code_postal, pays, pseudo, wallet, lien)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      );
+      try {
+        // Utiliser une transaction pour l'import complet
+        const importTransaction = db.transaction(() => {
+          // Prepared statements
+          const findClientByEmail = db.prepare("SELECT id FROM clients WHERE email = ? AND email IS NOT NULL AND email != ''");
+          const findClientByName = db.prepare('SELECT id FROM clients WHERE nom = ? AND prenom = ?');
+          const insertClient = db.prepare(
+            `INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, code_postal, pays, pseudo, wallet, lien)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          );
 
-      const findProduitByName = db.prepare('SELECT id FROM produits WHERE nom = ?');
-      const insertProduit = db.prepare(
-        `INSERT INTO produits (nom, ref, description, prix, poids, stock)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      );
+          const findProduitByName = db.prepare('SELECT id FROM produits WHERE nom = ?');
+          const insertProduit = db.prepare(
+            `INSERT INTO produits (nom, ref, description, prix, poids, stock)
+             VALUES (?, ?, ?, ?, ?, ?)`
+          );
 
-      const insertColis = db.prepare(
-        `INSERT INTO colis (numero_suivi, client_id, statut, poids,
-                            adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
-                            reference, notes, date_creation)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      );
+          const insertColis = db.prepare(
+            `INSERT INTO colis (numero_suivi, client_id, statut, poids,
+                                adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
+                                reference, notes, date_creation)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          );
 
-      const insertColisProduit = db.prepare(
-        `INSERT INTO colis_produits (colis_id, produit_id, quantite, lien)
-         VALUES (?, ?, ?, ?)`
-      );
+          const insertColisProduit = db.prepare(
+            `INSERT INTO colis_produits (colis_id, produit_id, quantite, lien)
+             VALUES (?, ?, ?, ?)`
+          );
 
-      results.forEach((row, index) => {
+          results.forEach((row, index) => {
         try {
           // ========== GESTION CLIENT ==========
           let clientId = null;
@@ -294,16 +297,24 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
           errors.push({ row: index + 1, error: err.message });
         }
       });
+        }); // Fin de la transaction
 
-      res.json({
-        message: 'Import terminé',
-        total: results.length,
-        success: successCount,
-        errors: errors.length,
-        errorDetails: errors,
-        clientsCreated,
-        produitsCreated
-      });
+        // Exécuter la transaction
+        importTransaction();
+
+        res.json({
+          message: 'Import terminé',
+          total: results.length,
+          success: successCount,
+          errors: errors.length,
+          errorDetails: errors,
+          clientsCreated,
+          produitsCreated
+        });
+      } catch (err) {
+        console.error('Erreur lors de l\'import CSV:', err);
+        res.status(500).json({ error: 'Erreur lors de l\'import: ' + err.message });
+      }
     })
     .on('error', (error) => {
       fs.unlinkSync(req.file.path);
