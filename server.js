@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
 const db = require('./database');
 const PDFDocument = require('pdfkit');
 const multer = require('multer');
@@ -33,6 +34,13 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static('public'));
+
+// Headers pour éviter les timeouts sur les proxies
+app.use((req, res, next) => {
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Keep-Alive', 'timeout=120');
+  next();
+});
 
 // ============= IMPORT CSV =============
 
@@ -1338,6 +1346,14 @@ app.post('/api/database/init-test-data', (req, res) => {
 
 // ============= DÉMARRAGE SERVEUR =============
 
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+// Configurer des timeouts plus longs pour éviter les déconnexions
+server.timeout = 300000; // 5 minutes
+server.keepAliveTimeout = 120000; // 2 minutes
+server.headersTimeout = 120000; // 2 minutes
+
+server.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
+  console.log(`⏱️  Timeouts configurés: server=${server.timeout}ms, keepAlive=${server.keepAliveTimeout}ms`);
 });
