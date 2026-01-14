@@ -1716,6 +1716,8 @@ async function uploadCSV(event) {
                 <p class="import-success">✅ Import réussi!</p>
                 <p>Total de lignes: <strong>${result.total}</strong></p>
                 <p>Colis créés avec succès: <strong>${result.success}</strong></p>
+                ${result.clientsCreated ? `<p>Nouveaux clients créés: <strong>${result.clientsCreated}</strong></p>` : ''}
+                ${result.produitsCreated ? `<p>Nouveaux produits créés: <strong>${result.produitsCreated}</strong></p>` : ''}
                 ${result.errors > 0 ? `<p class="import-error">Erreurs: <strong>${result.errors}</strong></p>` : ''}
                 ${result.errorDetails && result.errorDetails.length > 0 ? `
                     <details style="margin-top: 10px;">
@@ -1729,7 +1731,7 @@ async function uploadCSV(event) {
             resultDiv.style.display = 'block';
 
             // Rafraîchir les données en parallèle
-            Promise.all([loadStats(), loadClients(), loadColis()]);
+            Promise.all([loadStats(), loadClients(), loadColis(), loadProduits()]);
 
             // Réinitialiser le formulaire
             document.getElementById('csvUploadForm').reset();

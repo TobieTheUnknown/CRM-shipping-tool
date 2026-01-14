@@ -69,6 +69,8 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
   const results = [];
   const errors = [];
   let successCount = 0;
+  let clientsCreated = 0;
+  let produitsCreated = 0;
 
   fs.createReadStream(req.file.path)
     .pipe(csv())
@@ -80,58 +82,132 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
         return res.status(400).json({ error: 'Le fichier CSV est vide' });
       }
 
+      // Prepared statements
+      const findClientByEmail = db.prepare('SELECT id FROM clients WHERE email = ? AND email IS NOT NULL AND email != ""');
+      const findClientByName = db.prepare('SELECT id FROM clients WHERE nom = ? AND prenom = ?');
       const insertClient = db.prepare(
-        `INSERT INTO clients (nom, prenom, adresse, ville, code_postal, pays)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, code_postal, pays, pseudo, wallet, lien)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      );
+
+      const findProduitByName = db.prepare('SELECT id FROM produits WHERE nom = ?');
+      const insertProduit = db.prepare(
+        `INSERT INTO produits (nom, description, prix, poids, stock)
+         VALUES (?, ?, ?, ?, ?)`
       );
 
       const insertColis = db.prepare(
         `INSERT INTO colis (numero_suivi, client_id, statut, poids,
-                            adresse_expedition, ville_expedition, code_postal_expedition, pays_expedition,
-                            notes, date_creation)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                            adresse_expedition, adresse_ligne2, ville_expedition, code_postal_expedition, pays_expedition,
+                            reference, notes, date_creation)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      );
+
+      const insertColisProduit = db.prepare(
+        `INSERT INTO colis_produits (colis_id, produit_id, quantite, lien)
+         VALUES (?, ?, ?, ?)`
       );
 
       results.forEach((row, index) => {
         try {
+          // ========== GESTION CLIENT ==========
+          let clientId = null;
+
+          // Chercher client existant par email ou nom+prénom
+          const clientEmail = row['Client Email'] || '';
+          const clientNom = row['Client Nom'] || row["Adresse d'envoi"]?.split(',')[0] || `Client CSV ${index + 1}`;
+          const clientPrenom = row['Client Prenom'] || '';
+
+          if (clientEmail) {
+            const existing = findClientByEmail.get(clientEmail);
+            if (existing) clientId = existing.id;
+          }
+
+          if (!clientId && clientNom && clientPrenom) {
+            const existing = findClientByName.get(clientNom, clientPrenom);
+            if (existing) clientId = existing.id;
+          }
+
+          // Créer le client si nécessaire
+          if (!clientId) {
+            const adresseData = parseAdresse(row["Adresse d'envoi"] || '');
+            const clientResult = insertClient.run(
+              clientNom,
+              clientPrenom || null,
+              clientEmail || null,
+              row['Client Telephone'] || null,
+              adresseData.adresse || null,
+              adresseData.ville || null,
+              adresseData.code_postal || null,
+              adresseData.pays || 'France',
+              row['Client Pseudo'] || null,
+              row['Client Wallet'] || null,
+              row['Client Lien'] || null
+            );
+            clientId = clientResult.lastInsertRowid;
+            clientsCreated++;
+          }
+
+          // ========== GESTION PRODUIT ==========
+          let produitId = null;
+          const itemName = row['Item'] || '';
+
+          if (itemName) {
+            // Chercher produit existant par nom
+            const existingProduit = findProduitByName.get(itemName);
+            if (existingProduit) {
+              produitId = existingProduit.id;
+            } else {
+              // Créer le produit
+              const prixProduit = parseFloat(row['Prix Objet (€)'] || row['Prix Objet'] || 0) || null;
+              const poidsProduit = parseFloat(row['Poids Produit (kg)'] || 0) || null;
+              const stockProduit = parseInt(row['Stock Produit'] || 0) || 0;
+              const descriptionProduit = row['Description Produit'] || null;
+
+              const produitResult = insertProduit.run(
+                itemName,
+                descriptionProduit,
+                prixProduit,
+                poidsProduit,
+                stockProduit
+              );
+              produitId = produitResult.lastInsertRowid;
+              produitsCreated++;
+            }
+          }
+
+          // ========== GESTION COLIS ==========
           const adresseData = parseAdresse(row["Adresse d'envoi"] || '');
-          const nomClient = `Client CSV ${index + 1}`;
-
-          const clientResult = insertClient.run(
-            nomClient, '', adresseData.adresse, adresseData.ville, adresseData.code_postal, adresseData.pays
-          );
-          const clientId = clientResult.lastInsertRowid;
-
-          const item = row['Item'] || '';
-          const lien = row['Lien'] || '';
-          const prix = parseFloat(row['Prix Objet (€)'] || row['Prix Objet'] || 0);
-          const poids = parseFloat(row['Poids (kg)'] || row['Poids'] || 0);
-          const lienSuivi = row['Lien de suivi colis'] || '';
-          const photos = row['Photos/Vidéos associées'] || '';
+          const poidsColis = parseFloat(row['Poids (kg)'] || row['Poids'] || 0) || null;
+          const lienSuivi = row['Lien de suivi colis'] || null;
           const statut = row['Statut'] || 'En préparation';
-          const timestamp = row['Timestamp'] || null;
-          const numeroColisMois = row['N° Colis/mois'] || '';
-          const note = row['Note'] || '';
+          const timestamp = row['Timestamp'] || new Date().toISOString();
+          const reference = row['N° Colis/mois'] || null;
+          const notes = row['Note'] || null;
 
-          let notesComplete = note;
-          if (item) notesComplete += `\nItem: ${item}`;
-          if (lien) notesComplete += `\nLien: ${lien}`;
-          if (prix) notesComplete += `\nPrix: ${prix}€`;
-          if (photos) notesComplete += `\nPhotos/Vidéos: ${photos}`;
-          if (numeroColisMois) notesComplete += `\nN° Colis/mois: ${numeroColisMois}`;
-
-          insertColis.run(
-            lienSuivi || null,
+          const colisResult = insertColis.run(
+            lienSuivi,
             clientId,
             statut,
-            poids || null,
-            adresseData.adresse,
-            adresseData.ville,
-            adresseData.code_postal,
-            adresseData.pays,
-            notesComplete.trim(),
-            timestamp || new Date().toISOString()
+            poidsColis,
+            adresseData.adresse || null,
+            null, // adresse_ligne2
+            adresseData.ville || null,
+            adresseData.code_postal || null,
+            adresseData.pays || 'France',
+            reference,
+            notes,
+            timestamp
           );
+          const colisId = colisResult.lastInsertRowid;
+
+          // ========== GESTION RELATION COLIS-PRODUIT ==========
+          if (produitId) {
+            const quantite = parseInt(row['Quantite'] || 1);
+            const lienProduit = row['Lien'] || null;
+
+            insertColisProduit.run(colisId, produitId, quantite, lienProduit);
+          }
 
           successCount++;
         } catch (err) {
@@ -144,7 +220,9 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
         total: results.length,
         success: successCount,
         errors: errors.length,
-        errorDetails: errors
+        errorDetails: errors,
+        clientsCreated,
+        produitsCreated
       });
     })
     .on('error', (error) => {
