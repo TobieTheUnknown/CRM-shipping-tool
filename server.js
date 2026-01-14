@@ -15,17 +15,23 @@ const PORT = process.env.PORT || 6389;
 const dataPath = db.dataPath || __dirname;
 const uploadsPath = path.join(dataPath, 'uploads');
 
-// Configuration Multer pour l'upload de fichiers
-const upload = multer({ dest: uploadsPath });
+// Configuration Multer pour l'upload de fichiers avec limite de 50MB
+const upload = multer({
+  dest: uploadsPath,
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB max
+  }
+});
 
 // Créer le dossier uploads s'il n'existe pas
 if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
 
-// Middleware
+// Middleware avec limites augmentées
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static('public'));
 
 // ============= IMPORT CSV =============
