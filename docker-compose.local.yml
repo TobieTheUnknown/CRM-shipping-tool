@@ -1,16 +1,15 @@
-# Docker Compose pour Synology NAS
-# Chemin recommandé: /volume1/docker/crm/
-
+# Docker Compose pour développement local (Mac/Windows/Linux)
 services:
   crm:
+    build: .
     image: tobtheunknown/shiptrack-crm:latest
     container_name: shiptrack-crm
     restart: unless-stopped
     ports:
       - "6389:6389"
     volumes:
-      # Base de données persistante sur le NAS
-      - /volume1/docker/crm/data:/data
+      # Base de données persistante en local
+      - ./data:/data
     environment:
       - NODE_ENV=production
       - PORT=6389
