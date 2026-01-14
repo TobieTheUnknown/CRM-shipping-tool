@@ -961,6 +961,78 @@ async function deleteProduit(id) {
     }
 }
 
+// ============= CRÉATION RAPIDE PRODUIT =============
+
+function showQuickAddProduitModal() {
+    // Réinitialiser le formulaire
+    document.getElementById('formQuickProduit').reset();
+
+    // Pré-remplir le select des dimensions
+    const dimensionSelect = document.getElementById('quickProduitDimension');
+    dimensionSelect.innerHTML = '<option value="">Aucune</option>' +
+        dimensions.map(d => `<option value="${d.id}">${d.nom} (${d.longueur}x${d.largeur}x${d.hauteur}cm)</option>`).join('');
+
+    // Ouvrir la modal
+    document.getElementById('modalQuickProduit').classList.add('active');
+}
+
+async function saveQuickProduit(event) {
+    event.preventDefault();
+
+    const dimensionId = document.getElementById('quickProduitDimension').value;
+    const data = {
+        nom: document.getElementById('quickProduitNom').value,
+        description: document.getElementById('quickProduitDescription').value || '',
+        prix: parseFloat(document.getElementById('quickProduitPrix').value) || null,
+        poids: parseFloat(document.getElementById('quickProduitPoids').value) || null,
+        stock: parseInt(document.getElementById('quickProduitStock').value) || 0,
+        dimension_id: dimensionId ? parseInt(dimensionId) : null
+    };
+
+    try {
+        const response = await fetch(`${API_URL}/api/produits`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            const newProduit = await response.json();
+
+            // Recharger la liste des produits
+            await loadProduits();
+
+            // Ajouter automatiquement le produit au colis en cours
+            const produitComplet = produits.find(p => p.id === newProduit.id);
+            if (produitComplet) {
+                colisProduitsSelection.push({
+                    produit_id: produitComplet.id,
+                    nom: produitComplet.nom,
+                    poids: produitComplet.poids || 0,
+                    prix: produitComplet.prix || 0,
+                    description: produitComplet.description || '',
+                    dimension_id: produitComplet.dimension_id,
+                    stock: produitComplet.stock,
+                    quantite: 1,
+                    lien: ''
+                });
+
+                displayColisProduitsSelection();
+                calculatePoidsAndDimension();
+            }
+
+            // Fermer la modal
+            closeModal('modalQuickProduit');
+            showToast('Produit créé et ajouté au colis!');
+        } else {
+            showToast('Erreur lors de la création du produit', 'error');
+        }
+    } catch (error) {
+        console.error('Erreur création produit rapide:', error);
+        showToast('Erreur lors de la création du produit', 'error');
+    }
+}
+
 // ============= COLIS =============
 
 async function loadColis() {

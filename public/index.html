@@ -698,6 +698,9 @@
                             <!-- Résultats de recherche générés dynamiquement -->
                         </div>
                     </div>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="showQuickAddProduitModal()" style="margin-top: 8px;">
+                        + Créer un nouveau produit
+                    </button>
                 </div>
                 <h3>Adresse d'expédition</h3>
                 <div class="form-group">
@@ -765,6 +768,52 @@
                     <button type="button" class="btn btn-primary" onclick="confirmQuickClient()">✓ Créer ce client</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL CRÉATION RAPIDE PRODUIT -->
+    <div id="modalQuickProduit" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('modalQuickProduit')">&times;</span>
+            <h2>Créer un Produit Rapidement</h2>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
+                Remplissez les informations essentielles. Le produit sera automatiquement ajouté au colis en cours.
+            </p>
+            <form id="formQuickProduit" onsubmit="saveQuickProduit(event)">
+                <div class="form-group">
+                    <label>Nom du produit *</label>
+                    <input type="text" id="quickProduitNom" required placeholder="Ex: iPhone 13 Pro">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Poids (kg) *</label>
+                        <input type="number" step="0.001" id="quickProduitPoids" required placeholder="0.200">
+                    </div>
+                    <div class="form-group">
+                        <label>Prix (€)</label>
+                        <input type="number" step="0.01" id="quickProduitPrix" placeholder="399.00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Dimension du carton</label>
+                    <select id="quickProduitDimension">
+                        <option value="">Aucune</option>
+                        <!-- Options générées dynamiquement -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Stock initial *</label>
+                    <input type="number" id="quickProduitStock" required value="0" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="quickProduitDescription" rows="2" placeholder="Description optionnelle..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modalQuickProduit')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Créer et ajouter au colis</button>
+                </div>
+            </form>
         </div>
     </div>
 
