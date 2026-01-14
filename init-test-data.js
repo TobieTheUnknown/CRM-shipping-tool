@@ -5,6 +5,7 @@ console.log('Initialisation des données de test...\n');
 // Clients de test
 const clients = [
   {
+    pseudo: 'TechVIP75',
     nom: 'Dupont',
     prenom: 'Jean',
     email: 'jean.dupont@email.fr',
@@ -17,6 +18,7 @@ const clients = [
     lien: JSON.stringify(['https://www.vinted.fr/member/12345', 'https://www.ebay.fr/usr/jean_dupont'])
   },
   {
+    pseudo: 'SophieCollect69',
     nom: 'Martin',
     prenom: 'Sophie',
     email: 'sophie.martin@email.fr',
@@ -29,6 +31,7 @@ const clients = [
     lien: JSON.stringify(['https://www.leboncoin.fr/boutique/sophie_martin', 'https://www.instagram.com/sophie_collectibles/'])
   },
   {
+    pseudo: 'PierreBE',
     nom: 'Bernard',
     prenom: 'Pierre',
     email: 'pierre.bernard@email.be',
@@ -41,6 +44,7 @@ const clients = [
     lien: JSON.stringify(['https://www.2ememain.be/u/pierre_bernard/'])
   },
   {
+    pseudo: 'MariaRoma',
     nom: 'Rossi',
     prenom: 'Maria',
     email: 'maria.rossi@email.it',
@@ -53,6 +57,7 @@ const clients = [
     lien: JSON.stringify(['https://www.subito.it/utente/maria_rossi'])
   },
   {
+    pseudo: 'CarlosES',
     nom: 'Garcia',
     prenom: 'Carlos',
     email: 'carlos.garcia@email.es',
@@ -65,6 +70,7 @@ const clients = [
     lien: JSON.stringify(['https://www.wallapop.com/user/carlos_garcia', 'https://www.milanuncios.com/carlos_garcia'])
   },
   {
+    pseudo: 'JulieDepop',
     nom: 'Petit',
     prenom: 'Julie',
     email: 'julie.petit@email.fr',
@@ -77,6 +83,7 @@ const clients = [
     lien: JSON.stringify(['https://www.vinted.fr/member/julie_p', 'https://www.depop.com/juliepetit/'])
   },
   {
+    pseudo: 'HansBerlin',
     nom: 'Müller',
     prenom: 'Hans',
     email: 'hans.muller@email.de',
@@ -89,6 +96,7 @@ const clients = [
     lien: JSON.stringify(['https://www.ebay.de/usr/hans_muller'])
   },
   {
+    pseudo: 'MarcRetro13',
     nom: 'Lefebvre',
     prenom: 'Marc',
     email: 'marc.lefebvre@email.fr',
@@ -275,13 +283,14 @@ const colisData = [
 function insertClients() {
   console.log('\n--- Création des clients ---');
   const stmt = db.prepare(`
-    INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO clients (pseudo, nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   clients.forEach((client) => {
     try {
       stmt.run(
+        client.pseudo || null,
         client.nom,
         client.prenom,
         client.email,
@@ -293,7 +302,7 @@ function insertClients() {
         client.wallet || null,
         client.lien || null
       );
-      console.log(`✓ Client créé: ${client.nom} ${client.prenom} (${client.pays})`);
+      console.log(`✓ Client créé: ${client.pseudo ? client.pseudo + ' - ' : ''}${client.nom} ${client.prenom} (${client.pays})`);
     } catch (err) {
       console.error(`Erreur insertion client ${client.nom}:`, err.message);
     }

@@ -67,6 +67,7 @@ function initDatabase() {
   try { db.exec(`ALTER TABLE colis ADD COLUMN reference TEXT`); } catch (err) {}
   try { db.exec(`ALTER TABLE clients ADD COLUMN wallet TEXT`); } catch (err) {}
   try { db.exec(`ALTER TABLE clients ADD COLUMN lien TEXT`); } catch (err) {}
+  try { db.exec(`ALTER TABLE clients ADD COLUMN pseudo TEXT`); } catch (err) {}
   try { db.exec(`ALTER TABLE colis ADD COLUMN adresse_ligne2 TEXT`); } catch (err) {}
 
   // Table Produits dans Colis (relation many-to-many)

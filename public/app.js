@@ -117,17 +117,35 @@ async function loadClients() {
     }
 }
 
+// Helper pour formater le nom du client avec pseudo
+function formatClientName(client, includePrenom = false) {
+    const parts = [];
+    if (client.pseudo) {
+        parts.push(client.pseudo);
+    }
+    if (client.nom) {
+        parts.push(client.nom);
+    }
+    const baseName = parts.length > 0 ? parts.join(' - ') : 'Client';
+
+    if (includePrenom && client.prenom) {
+        return `${baseName} ${client.prenom}`;
+    }
+    return baseName;
+}
+
 function displayClients(filteredList = null) {
     const tbody = document.getElementById('clientsTableBody');
     const listToDisplay = filteredList || clients;
 
     if (listToDisplay.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">Aucun client</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">Aucun client</td></tr>';
         return;
     }
 
     tbody.innerHTML = listToDisplay.map(client => `
         <tr style="cursor: pointer;" onclick="viewClientDetails(${client.id})">
+            <td>${client.pseudo || ''}</td>
             <td>${client.nom}</td>
             <td>${client.prenom || ''}</td>
             <td>${client.email || ''}</td>
@@ -160,7 +178,7 @@ function filterClients() {
 function updateClientSelect() {
     const select = document.getElementById('colisClientId');
     select.innerHTML = '<option value="">Sélectionner un client</option>' +
-        clients.map(c => `<option value="${c.id}">${c.nom} ${c.prenom || ''}</option>`).join('');
+        clients.map(c => `<option value="${c.id}">${formatClientName(c, true)}</option>`).join('');
 }
 
 function showAddClientModal() {
@@ -178,6 +196,7 @@ function editClient(id) {
     if (!client) return;
 
     document.getElementById('clientId').value = client.id;
+    document.getElementById('clientPseudo').value = client.pseudo || '';
     document.getElementById('clientNom').value = client.nom;
     document.getElementById('clientPrenom').value = client.prenom || '';
     document.getElementById('clientEmail').value = client.email || '';
@@ -238,6 +257,7 @@ async function saveClient(event) {
     const liens = getLiensFromForm();
 
     const data = {
+        pseudo: document.getElementById('clientPseudo').value,
         nom: document.getElementById('clientNom').value,
         prenom: document.getElementById('clientPrenom').value,
         email: document.getElementById('clientEmail').value,
@@ -331,7 +351,7 @@ async function viewClientDetails(clientId) {
         const walletsHtml = wallets.length > 0 ? `
             <div>
                 <strong>Wallets:</strong><br>
-                ${wallets.map(w => `<code style="background: #f0f0f0; padding: 5px; border-radius: 3px; display: block; margin-top: 5px; word-break: break-all;">${w}</code>`).join('')}
+                ${wallets.map(w => `<code style="background: rgba(255,255,255,0.05); padding: 5px; border-radius: 3px; display: block; margin-top: 5px; word-break: break-all; border: 1px solid rgba(255,255,255,0.1);">${w}</code>`).join('')}
             </div>
         ` : '';
 
@@ -436,10 +456,18 @@ async function viewClientDetails(clientId) {
 
         const detailsHtml = `
             <div style="display: grid; gap: 15px;">
+                ${client.pseudo ? `<div>
+                    <strong>Pseudo:</strong><br>
+                    ${client.pseudo}
+                </div>` : ''}
                 <div>
-                    <strong>Nom complet:</strong><br>
-                    ${client.nom} ${client.prenom || ''}
+                    <strong>Nom:</strong><br>
+                    ${client.nom}
                 </div>
+                ${client.prenom ? `<div>
+                    <strong>Prénom:</strong><br>
+                    ${client.prenom}
+                </div>` : ''}
                 <div>
                     <strong>Email:</strong><br>
                     ${client.email ? `<a href="mailto:${client.email}">${client.email}</a>` : '-'}
@@ -1068,11 +1096,11 @@ function renderColisRow(c, section) {
     }
 
     // Client et adresse
-    const clientNom = `${c.client_nom || ''} ${c.client_prenom || ''}`.trim();
+    const clientFormatted = formatClientName({ pseudo: c.client_pseudo, nom: c.client_nom, prenom: c.client_prenom }, true);
     const adresse = c.ville_expedition || c.adresse_expedition || '';
     const pays = c.pays_expedition || 'France';
     const clientHtml = `
-        <span class="client-name" style="cursor: pointer; color: #667eea;" onclick="viewClientDetails(${c.client_id})">${clientNom}</span>
+        <span class="client-name" style="cursor: pointer; color: #667eea;" onclick="viewClientDetails(${c.client_id})">${clientFormatted}</span>
         <span class="client-address">${adresse}${pays !== 'France' ? ` - ${pays}` : ''}</span>
     `;
 
@@ -1208,10 +1236,70 @@ async function editColis(id) {
     document.getElementById('modalColis').classList.add('active');
 }
 
+async function checkDuplicateLinks(colisId) {
+    // Récupérer tous les liens des produits sélectionnés
+    const liens = colisProduitsSelection
+        .map(p => p.lien)
+        .filter(lien => lien && lien.trim());
+
+    if (liens.length === 0) return null;
+
+    // Vérifier chaque lien
+    for (const lien of liens) {
+        try {
+            const response = await fetch(`${API_URL}/api/colis/check-duplicate-link`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lien, excludeColisId: colisId || null })
+            });
+
+            const result = await response.json();
+
+            if (result.duplicate && result.colis && result.colis.length > 0) {
+                // Créer un message d'alerte avec les détails du colis existant
+                const existingColis = result.colis[0];
+                const clientName = formatClientName({
+                    pseudo: existingColis.client_pseudo,
+                    nom: existingColis.client_nom,
+                    prenom: existingColis.client_prenom
+                }, true);
+
+                const message = `⚠️ ATTENTION: Ce lien existe déjà!\n\nLien: ${lien}\n\nColis existant:\n` +
+                    `- Client: ${clientName}\n` +
+                    `- Statut: ${existingColis.statut}\n` +
+                    `- N° suivi: ${existingColis.numero_suivi || 'N/A'}\n` +
+                    `- Date: ${new Date(existingColis.date_creation).toLocaleDateString('fr-FR')}\n\n` +
+                    `Cliquer "OK" pour voir le colis ou "Annuler" pour continuer`;
+
+                if (confirm(message)) {
+                    // Ouvrir le colis existant
+                    closeModal('modalColis');
+                    editColis(existingColis.id);
+                    return existingColis;
+                } else {
+                    // L'utilisateur veut continuer malgré le doublon
+                    return null;
+                }
+            }
+        } catch (error) {
+            console.error('Erreur lors de la vérification des doublons:', error);
+        }
+    }
+
+    return null;
+}
+
 async function saveColis(event) {
     event.preventDefault();
 
     const id = document.getElementById('colisId').value;
+
+    // Vérifier les doublons de liens avant de sauvegarder
+    const duplicate = await checkDuplicateLinks(id);
+    if (duplicate) {
+        // L'utilisateur a choisi de voir le colis existant
+        return;
+    }
 
     // Préparer les produits à envoyer
     const produitsToSend = colisProduitsSelection.map(p => ({

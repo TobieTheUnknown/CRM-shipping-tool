@@ -174,13 +174,13 @@ app.get('/api/clients/:id', (req, res) => {
 });
 
 app.post('/api/clients', (req, res) => {
-  const { nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien } = req.body;
+  const { nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien, pseudo } = req.body;
 
   try {
     const result = db.prepare(
-      `INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(nom, prenom, email, telephone, adresse, ville, code_postal, pays || 'France', wallet, lien);
+      `INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien, pseudo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(nom, prenom, email, telephone, adresse, ville, code_postal, pays || 'France', wallet, lien, pseudo);
 
     res.json({ id: result.lastInsertRowid, message: 'Client créé avec succès' });
   } catch (err) {
@@ -189,14 +189,14 @@ app.post('/api/clients', (req, res) => {
 });
 
 app.put('/api/clients/:id', (req, res) => {
-  const { nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien } = req.body;
+  const { nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien, pseudo } = req.body;
 
   try {
     const result = db.prepare(
       `UPDATE clients
-       SET nom=?, prenom=?, email=?, telephone=?, adresse=?, ville=?, code_postal=?, pays=?, wallet=?, lien=?
+       SET nom=?, prenom=?, email=?, telephone=?, adresse=?, ville=?, code_postal=?, pays=?, wallet=?, lien=?, pseudo=?
        WHERE id=?`
-    ).run(nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien, req.params.id);
+    ).run(nom, prenom, email, telephone, adresse, ville, code_postal, pays, wallet, lien, pseudo, req.params.id);
 
     res.json({ message: 'Client mis à jour', changes: result.changes });
   } catch (err) {
@@ -266,12 +266,54 @@ app.delete('/api/produits/:id', (req, res) => {
 
 // ============= ROUTES COLIS =============
 
+// Vérifier si un lien existe déjà dans les colis
+app.post('/api/colis/check-duplicate-link', (req, res) => {
+  const { lien, excludeColisId } = req.body;
+
+  if (!lien || !lien.trim()) {
+    return res.json({ duplicate: false });
+  }
+
+  try {
+    const query = `
+      SELECT c.*, cp.lien,
+             cl.nom as client_nom,
+             cl.prenom as client_prenom,
+             cl.pseudo as client_pseudo
+      FROM colis_produits cp
+      JOIN colis c ON cp.colis_id = c.id
+      JOIN clients cl ON c.client_id = cl.id
+      WHERE cp.lien LIKE ?
+      ${excludeColisId ? 'AND c.id != ?' : ''}
+      ORDER BY c.date_creation DESC
+    `;
+
+    const params = excludeColisId
+      ? [`%${lien.trim()}%`, excludeColisId]
+      : [`%${lien.trim()}%`];
+
+    const rows = db.prepare(query).all(...params);
+
+    if (rows.length > 0) {
+      res.json({
+        duplicate: true,
+        colis: rows
+      });
+    } else {
+      res.json({ duplicate: false });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/colis', (req, res) => {
   try {
     const rows = db.prepare(`
       SELECT c.*,
              cl.nom as client_nom,
              cl.prenom as client_prenom,
+             cl.pseudo as client_pseudo,
              cl.email as client_email
       FROM colis c
       LEFT JOIN clients cl ON c.client_id = cl.id

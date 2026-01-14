@@ -383,6 +383,7 @@
                     <table id="clientsTable">
                         <thead>
                             <tr>
+                                <th>Pseudo</th>
                                 <th>Nom</th>
                                 <th>Prénom</th>
                                 <th>Email</th>
@@ -392,7 +393,7 @@
                             </tr>
                         </thead>
                         <tbody id="clientsTableBody">
-                            <tr><td colspan="6" class="empty">Aucun client</td></tr>
+                            <tr><td colspan="7" class="empty">Aucun client</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -498,6 +499,10 @@
 
             <form id="formClient" onsubmit="saveClient(event)">
                 <input type="hidden" id="clientId">
+                <div class="form-group">
+                    <label>Pseudo / Surnom</label>
+                    <input type="text" id="clientPseudo" placeholder="Ex: TechCollector42">
+                </div>
                 <div class="form-group">
                     <label>Nom *</label>
                     <input type="text" id="clientNom" required>
