@@ -825,6 +825,19 @@ input[type="checkbox"] {
     font-weight: 600;
 }
 
+.section-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 4px 12px;
+    background: rgba(0, 217, 255, 0.15);
+    color: var(--accent-cyan);
+    border-radius: 8px;
+    border: 1px solid rgba(0, 217, 255, 0.3);
+    min-width: 32px;
+    text-align: center;
+}
+
 .section-title.collapsible {
     cursor: pointer;
     user-select: none;
@@ -1753,4 +1766,46 @@ input[type="checkbox"] {
         min-width: auto;
         max-width: none;
     }
+}
+
+/* =============== MERGE ITEMS =============== */
+.merge-preview {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.merge-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-card);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: all 0.15s;
+}
+
+.merge-item:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-cyan);
+}
+
+.merge-item input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--accent-cyan);
+}
+
+.merge-item input[type="radio"]:checked + label {
+    color: var(--accent-cyan);
+}
+
+.merge-item label {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }

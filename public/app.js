@@ -134,17 +134,20 @@ function formatClientName(client, includePrenom = false) {
     return baseName;
 }
 
+let selectedClients = new Set();
+
 function displayClients(filteredList = null) {
     const tbody = document.getElementById('clientsTableBody');
     const listToDisplay = filteredList || clients;
 
     if (listToDisplay.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty">Aucun client</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">Aucun client</td></tr>';
         return;
     }
 
     tbody.innerHTML = listToDisplay.map(client => `
         <tr style="cursor: pointer;" onclick="viewClientDetails(${client.id})">
+            <td onclick="event.stopPropagation()"><input type="checkbox" class="client-checkbox" value="${client.id}" onchange="updateClientSelection()"></td>
             <td>${client.pseudo || ''}</td>
             <td>${client.nom}</td>
             <td>${client.prenom || ''}</td>
@@ -851,18 +854,22 @@ async function loadProduits() {
     }
 }
 
+let selectedProduits = new Set();
+
 function displayProduits(filteredList = null) {
     const tbody = document.getElementById('produitsTableBody');
     const listToDisplay = filteredList || produits;
 
     if (listToDisplay.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">Aucun produit</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">Aucun produit</td></tr>';
         return;
     }
 
     tbody.innerHTML = listToDisplay.map(produit => `
         <tr>
+            <td><input type="checkbox" class="produit-checkbox" value="${produit.id}" onchange="updateProduitSelection()"></td>
             <td>${produit.nom}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent-cyan);">${produit.ref || '-'}</td>
             <td>${produit.description || ''}</td>
             <td>${produit.prix ? produit.prix.toFixed(2) + ' €' : ''}</td>
             <td>${produit.poids ? produit.poids + ' kg' : ''}</td>
@@ -903,6 +910,7 @@ function editProduit(id) {
 
     document.getElementById('produitId').value = produit.id;
     document.getElementById('produitNom').value = produit.nom;
+    document.getElementById('produitRef').value = produit.ref || '';
     document.getElementById('produitDescription').value = produit.description || '';
     document.getElementById('produitPrix').value = produit.prix || '';
     document.getElementById('produitPoids').value = produit.poids || '';
@@ -919,6 +927,7 @@ async function saveProduit(event) {
     const dimensionId = document.getElementById('produitDimensionId').value;
     const data = {
         nom: document.getElementById('produitNom').value,
+        ref: document.getElementById('produitRef').value || null,
         description: document.getElementById('produitDescription').value,
         prix: parseFloat(document.getElementById('produitPrix').value) || null,
         poids: parseFloat(document.getElementById('produitPoids').value) || null,
@@ -1008,6 +1017,7 @@ async function saveQuickProduit(event) {
                 colisProduitsSelection.push({
                     produit_id: produitComplet.id,
                     nom: produitComplet.nom,
+                    ref: produitComplet.ref || '',
                     poids: produitComplet.poids || 0,
                     prix: produitComplet.prix || 0,
                     description: produitComplet.description || '',
@@ -1019,6 +1029,7 @@ async function saveQuickProduit(event) {
 
                 displayColisProduitsSelection();
                 calculatePoidsAndDimension();
+                updateColisReference();
             }
 
             // Fermer la modal
@@ -1289,6 +1300,7 @@ async function editColis(id) {
             colisProduitsSelection.push({
                 produit_id: p.produit_id,
                 nom: p.nom || (produit ? produit.nom : 'Produit'),
+                ref: p.ref || (produit ? produit.ref : '') || '',
                 poids: p.poids || (produit ? produit.poids : 0) || 0,
                 dimension_id: p.dimension_id || (produit ? produit.dimension_id : null),
                 stock: produit ? produit.stock + p.quantite : p.quantite, // Le stock actuel + la quantité déjà réservée
@@ -1299,6 +1311,7 @@ async function editColis(id) {
     }
     displayColisProduitsSelection();
     updateProduitSelect();
+    updateColisReference();
 
     // Pour édition, réinitialiser les sélecteurs de timbres
     // mais conserver le numéro de suivi existant
@@ -2243,6 +2256,7 @@ function addProduitFromSearch(produitId) {
         colisProduitsSelection.push({
             produit_id: produitId,
             nom: produit.nom,
+            ref: produit.ref || '',
             poids: produit.poids || 0,
             prix: produit.prix || 0,
             description: produit.description || '',
@@ -2255,6 +2269,7 @@ function addProduitFromSearch(produitId) {
 
     displayColisProduitsSelection();
     calculatePoidsAndDimension();
+    updateColisReference();
 
     // Vider et cacher la recherche
     document.getElementById('searchProduitsColis').value = '';
@@ -2335,6 +2350,31 @@ function removeProduitFromColis(index) {
     colisProduitsSelection.splice(index, 1);
     displayColisProduitsSelection();
     calculatePoidsAndDimension();
+    updateColisReference();
+}
+
+// Calculer la référence du colis basée sur les produits sélectionnés
+function updateColisReference() {
+    const refInput = document.getElementById('colisReference');
+    if (!refInput) return;
+
+    if (colisProduitsSelection.length === 0) {
+        refInput.value = '';
+        refInput.placeholder = 'Ajoutez des produits...';
+        return;
+    }
+
+    // Récupérer les références des produits sélectionnés
+    const refs = colisProduitsSelection
+        .map(p => p.ref)
+        .filter(ref => ref && ref.trim() !== '');
+
+    if (refs.length === 0) {
+        refInput.value = '';
+        refInput.placeholder = 'Aucune référence sur les produits';
+    } else {
+        refInput.value = refs.join('+');
+    }
 }
 
 // Calculer le poids total et sélectionner la bonne dimension
@@ -3202,5 +3242,207 @@ async function saveEditTimbre(event) {
     } catch (error) {
         console.error('Erreur édition timbre:', error);
         showToast('Erreur lors de la sauvegarde', 'error');
+    }
+}
+
+// ============= FUSION CLIENTS =============
+
+function updateClientSelection() {
+    const checkboxes = document.querySelectorAll('.client-checkbox:checked');
+    selectedClients.clear();
+    checkboxes.forEach(cb => selectedClients.add(parseInt(cb.value)));
+
+    const btnMerge = document.getElementById('btnMergeClients');
+    const count = document.getElementById('selectedClientsCount');
+
+    if (selectedClients.size >= 2) {
+        btnMerge.style.display = 'block';
+        count.textContent = selectedClients.size;
+    } else {
+        btnMerge.style.display = 'none';
+    }
+
+    // Update select all checkbox
+    const selectAll = document.getElementById('selectAllClients');
+    const allCheckboxes = document.querySelectorAll('.client-checkbox');
+    selectAll.checked = allCheckboxes.length > 0 && checkboxes.length === allCheckboxes.length;
+}
+
+function toggleSelectAllClients() {
+    const selectAll = document.getElementById('selectAllClients');
+    const checkboxes = document.querySelectorAll('.client-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateClientSelection();
+}
+
+function showMergeClientsModal() {
+    if (selectedClients.size < 2) {
+        showToast('Sélectionnez au moins 2 clients à fusionner', 'warning');
+        return;
+    }
+
+    const selectedClientsData = clients.filter(c => selectedClients.has(c.id));
+    const preview = document.getElementById('mergeClientsPreview');
+
+    preview.innerHTML = `
+        <p style="margin-bottom: 15px; font-weight: 600;">Clients sélectionnés (${selectedClientsData.length}):</p>
+        ${selectedClientsData.map(client => `
+            <div class="merge-item">
+                <input type="radio" name="primaryClient" value="${client.id}" id="client_${client.id}" onchange="enableMergeButton('Clients')">
+                <label for="client_${client.id}" style="flex: 1; cursor: pointer;">
+                    <div style="font-weight: 600;">${formatClientName(client, true)}</div>
+                    <div style="font-size: 13px; color: var(--text-secondary);">
+                        ${client.email || 'Pas d\'email'} | ${client.telephone || 'Pas de tél.'} | ${client.ville || 'Pas de ville'}
+                    </div>
+                </label>
+            </div>
+        `).join('')}
+        <p style="margin-top: 15px; padding: 10px; background: rgba(251, 146, 60, 0.1); border-radius: 8px; font-size: 13px; color: var(--accent-orange);">
+            ⚠️ Les autres clients seront supprimés après transfert de leurs colis.
+        </p>
+    `;
+
+    document.getElementById('btnConfirmMergeClients').disabled = true;
+    document.getElementById('modalMergeClients').classList.add('active');
+}
+
+function enableMergeButton(type) {
+    document.getElementById(`btnConfirmMerge${type}`).disabled = false;
+}
+
+async function confirmMergeClients() {
+    const primaryClientId = parseInt(document.querySelector('input[name="primaryClient"]:checked')?.value);
+
+    if (!primaryClientId) {
+        showToast('Sélectionnez le client à conserver', 'warning');
+        return;
+    }
+
+    const secondaryIds = Array.from(selectedClients).filter(id => id !== primaryClientId);
+
+    try {
+        const response = await fetch(`${API_URL}/api/clients/merge`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                primaryId: primaryClientId,
+                secondaryIds: secondaryIds
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            closeModal('modalMergeClients');
+            selectedClients.clear();
+            updateClientSelection();
+            await Promise.all([loadClients(), loadColis(), loadStats()]);
+            showToast(`${result.merged} client(s) fusionné(s), ${result.colisTransferred} colis transféré(s)`, 'success');
+        } else {
+            const error = await response.json();
+            showToast('Erreur: ' + error.error, 'error');
+        }
+    } catch (error) {
+        console.error('Erreur fusion clients:', error);
+        showToast('Erreur lors de la fusion', 'error');
+    }
+}
+
+// ============= FUSION PRODUITS =============
+
+function updateProduitSelection() {
+    const checkboxes = document.querySelectorAll('.produit-checkbox:checked');
+    selectedProduits.clear();
+    checkboxes.forEach(cb => selectedProduits.add(parseInt(cb.value)));
+
+    const btnMerge = document.getElementById('btnMergeProduits');
+    const count = document.getElementById('selectedProduitsCount');
+
+    if (selectedProduits.size >= 2) {
+        btnMerge.style.display = 'block';
+        count.textContent = selectedProduits.size;
+    } else {
+        btnMerge.style.display = 'none';
+    }
+
+    // Update select all checkbox
+    const selectAll = document.getElementById('selectAllProduits');
+    const allCheckboxes = document.querySelectorAll('.produit-checkbox');
+    selectAll.checked = allCheckboxes.length > 0 && checkboxes.length === allCheckboxes.length;
+}
+
+function toggleSelectAllProduits() {
+    const selectAll = document.getElementById('selectAllProduits');
+    const checkboxes = document.querySelectorAll('.produit-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateProduitSelection();
+}
+
+function showMergeProduitsModal() {
+    if (selectedProduits.size < 2) {
+        showToast('Sélectionnez au moins 2 produits à fusionner', 'warning');
+        return;
+    }
+
+    const selectedProduitsData = produits.filter(p => selectedProduits.has(p.id));
+    const preview = document.getElementById('mergeProduitsPreview');
+
+    preview.innerHTML = `
+        <p style="margin-bottom: 15px; font-weight: 600;">Produits sélectionnés (${selectedProduitsData.length}):</p>
+        ${selectedProduitsData.map(produit => `
+            <div class="merge-item">
+                <input type="radio" name="primaryProduit" value="${produit.id}" id="produit_${produit.id}" onchange="enableMergeButton('Produits')">
+                <label for="produit_${produit.id}" style="flex: 1; cursor: pointer;">
+                    <div style="font-weight: 600;">${produit.nom}</div>
+                    <div style="font-size: 13px; color: var(--text-secondary);">
+                        ${produit.prix ? produit.prix.toFixed(2) + ' €' : 'Pas de prix'} |
+                        ${produit.poids ? produit.poids + ' kg' : 'Pas de poids'} |
+                        Stock: ${produit.stock || 0}
+                    </div>
+                </label>
+            </div>
+        `).join('')}
+        <p style="margin-top: 15px; padding: 10px; background: rgba(251, 146, 60, 0.1); border-radius: 8px; font-size: 13px; color: var(--accent-orange);">
+            ⚠️ Les autres produits seront supprimés. Leurs stocks seront additionnés au produit conservé.
+        </p>
+    `;
+
+    document.getElementById('btnConfirmMergeProduits').disabled = true;
+    document.getElementById('modalMergeProduits').classList.add('active');
+}
+
+async function confirmMergeProduits() {
+    const primaryProduitId = parseInt(document.querySelector('input[name="primaryProduit"]:checked')?.value);
+
+    if (!primaryProduitId) {
+        showToast('Sélectionnez le produit à conserver', 'warning');
+        return;
+    }
+
+    const secondaryIds = Array.from(selectedProduits).filter(id => id !== primaryProduitId);
+
+    try {
+        const response = await fetch(`${API_URL}/api/produits/merge`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                primaryId: primaryProduitId,
+                secondaryIds: secondaryIds
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            closeModal('modalMergeProduits');
+            selectedProduits.clear();
+            updateProduitSelection();
+            await Promise.all([loadProduits(), loadColis(), loadStats()]);
+            showToast(`${result.merged} produit(s) fusionné(s), ${result.relationsTransferred} relation(s) transférée(s)`, 'success');
+        } else {
+            const error = await response.json();
+            showToast('Erreur: ' + error.error, 'error');
+        }
+    } catch (error) {
+        console.error('Erreur fusion produits:', error);
+        showToast('Erreur lors de la fusion', 'error');
     }
 }

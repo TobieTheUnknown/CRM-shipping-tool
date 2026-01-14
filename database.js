@@ -84,6 +84,9 @@ function initDatabase() {
   // Migration: ajouter lien si manquant
   try { db.exec(`ALTER TABLE colis_produits ADD COLUMN lien TEXT`); } catch (err) {}
 
+  // Migration: ajouter ref aux produits
+  try { db.exec(`ALTER TABLE produits ADD COLUMN ref TEXT`); } catch (err) {}
+
   // Table Dimensions de cartons
   db.exec(`CREATE TABLE IF NOT EXISTS dimensions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

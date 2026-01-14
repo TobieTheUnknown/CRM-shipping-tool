@@ -289,7 +289,10 @@
 
                 <!-- COLIS EN PRÉPARATION -->
                 <div class="colis-section">
-                    <h3 class="section-title">📦 En préparation (<span id="countEnPreparation">0</span>)</h3>
+                    <h3 class="section-title">
+                        <span>📦 En préparation</span>
+                        <span class="section-count" id="countEnPreparation">0</span>
+                    </h3>
                     <div class="table-container">
                         <table class="colisTable">
                             <thead>
@@ -313,7 +316,10 @@
 
                 <!-- COLIS PROBLÉMATIQUES (Out of stock / Incomplet) -->
                 <div class="colis-section">
-                    <h3 class="section-title" style="color: var(--accent-orange);">⚠️ Problématiques (<span id="countProblematiques">0</span>)</h3>
+                    <h3 class="section-title" style="color: var(--accent-orange);">
+                        <span>⚠️ Problématiques</span>
+                        <span class="section-count" id="countProblematiques">0</span>
+                    </h3>
                     <div class="table-container">
                         <table class="colisTable">
                             <thead>
@@ -338,8 +344,11 @@
                 <!-- COLIS ENVOYÉS -->
                 <div class="colis-section">
                     <h3 class="section-title collapsible" onclick="toggleSection('expedies')">
-                        📫 Colis envoyés (<span id="countExpedies">0</span>)
-                        <span class="toggle-icon" id="toggleExpedies">▼</span>
+                        <span>📫 Colis envoyés</span>
+                        <span style="display: flex; align-items: center; gap: 12px;">
+                            <span class="section-count" id="countExpedies">0</span>
+                            <span class="toggle-icon" id="toggleExpedies">▼</span>
+                        </span>
                     </h3>
                     <div class="table-container" id="sectionExpedies">
                         <table class="colisTable">
@@ -377,12 +386,16 @@
                         <input type="text" id="searchClients" placeholder="🔍 Rechercher un client..." oninput="filterClients()">
                     </div>
                     <button class="btn btn-primary" onclick="showAddClientModal()">+ Nouveau Client</button>
+                    <button class="btn btn-success" onclick="showMergeClientsModal()" id="btnMergeClients" style="display: none;">
+                        🔀 Fusionner (<span id="selectedClientsCount">0</span>)
+                    </button>
                 </div>
 
                 <div class="table-container">
                     <table id="clientsTable">
                         <thead>
                             <tr>
+                                <th><input type="checkbox" id="selectAllClients" onchange="toggleSelectAllClients()"></th>
                                 <th>Pseudo</th>
                                 <th>Nom</th>
                                 <th>Prénom</th>
@@ -393,7 +406,7 @@
                             </tr>
                         </thead>
                         <tbody id="clientsTableBody">
-                            <tr><td colspan="7" class="empty">Aucun client</td></tr>
+                            <tr><td colspan="8" class="empty">Aucun client</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -413,13 +426,18 @@
                         <input type="text" id="searchProduits" placeholder="🔍 Rechercher un produit..." oninput="filterProduits()">
                     </div>
                     <button class="btn btn-primary" onclick="showAddProduitModal()">+ Nouveau Produit</button>
+                    <button class="btn btn-success" onclick="showMergeProduitsModal()" id="btnMergeProduits" style="display: none;">
+                        🔀 Fusionner (<span id="selectedProduitsCount">0</span>)
+                    </button>
                 </div>
 
                 <div class="table-container">
                     <table id="produitsTable">
                         <thead>
                             <tr>
+                                <th><input type="checkbox" id="selectAllProduits" onchange="toggleSelectAllProduits()"></th>
                                 <th>Nom</th>
+                                <th>Réf.</th>
                                 <th>Description</th>
                                 <th>Prix</th>
                                 <th>Poids</th>
@@ -428,7 +446,7 @@
                             </tr>
                         </thead>
                         <tbody id="produitsTableBody">
-                            <tr><td colspan="6" class="empty">Aucun produit</td></tr>
+                            <tr><td colspan="8" class="empty">Aucun produit</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -579,6 +597,10 @@
                     <input type="text" id="produitNom" required>
                 </div>
                 <div class="form-group">
+                    <label>Référence</label>
+                    <input type="text" id="produitRef" placeholder="Ex: GOLD-2.5G, WATCH-001">
+                </div>
+                <div class="form-group">
                     <label>Description</label>
                     <textarea id="produitDescription" rows="3"></textarea>
                 </div>
@@ -670,8 +692,8 @@
                         <input type="number" step="0.01" id="colisPoids">
                     </div>
                     <div class="form-group">
-                        <label>Référence (pour étiquette)</label>
-                        <input type="text" id="colisReference" placeholder="Ex: REF2024-001">
+                        <label>Référence (calculée auto.)</label>
+                        <input type="text" id="colisReference" placeholder="Ajoutez des produits..." readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed;">
                     </div>
                 </div>
 
@@ -853,6 +875,46 @@
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL FUSION CLIENTS -->
+    <div id="modalMergeClients" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('modalMergeClients')">&times;</span>
+            <h2>🔀 Fusionner les clients</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                Sélectionnez le client à conserver. Tous les colis des autres clients seront transférés vers celui-ci, puis les doublons seront supprimés.
+            </p>
+            <div id="mergeClientsPreview" class="merge-preview">
+                <!-- Liste des clients sélectionnés générée dynamiquement -->
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modalMergeClients')">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="confirmMergeClients()" id="btnConfirmMergeClients" disabled>
+                    🔀 Fusionner les clients
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL FUSION PRODUITS -->
+    <div id="modalMergeProduits" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('modalMergeProduits')">&times;</span>
+            <h2>🔀 Fusionner les produits</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                Sélectionnez le produit à conserver. Toutes les relations colis-produits seront transférées vers celui-ci, puis les doublons seront supprimés.
+            </p>
+            <div id="mergeProduitsPreview" class="merge-preview">
+                <!-- Liste des produits sélectionnés générée dynamiquement -->
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modalMergeProduits')">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="confirmMergeProduits()" id="btnConfirmMergeProduits" disabled>
+                    🔀 Fusionner les produits
+                </button>
+            </div>
         </div>
     </div>
 

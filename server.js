@@ -92,8 +92,8 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
 
       const findProduitByName = db.prepare('SELECT id FROM produits WHERE nom = ?');
       const insertProduit = db.prepare(
-        `INSERT INTO produits (nom, description, prix, poids, stock)
-         VALUES (?, ?, ?, ?, ?)`
+        `INSERT INTO produits (nom, ref, description, prix, poids, stock)
+         VALUES (?, ?, ?, ?, ?, ?)`
       );
 
       const insertColis = db.prepare(
@@ -176,6 +176,7 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
               produitId = existingProduit.id;
             } else {
               // Créer le produit
+              const refProduit = row['Ref Produit'] || null;
               const prixProduit = parseFloat(row['Prix Objet (€)'] || row['Prix Objet'] || 0) || null;
               const poidsProduit = parseFloat(row['Poids Produit (kg)'] || 0) || null;
               const stockProduit = parseInt(row['Stock Produit'] || 0) || 0;
@@ -183,6 +184,7 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
 
               const produitResult = insertProduit.run(
                 itemName,
+                refProduit,
                 descriptionProduit,
                 prixProduit,
                 poidsProduit,
@@ -213,27 +215,65 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
           }
 
           const poidsColis = parseFloat(row['Poids (kg)'] || row['Poids'] || 0) || null;
-          const lienSuivi = row['Lien de suivi colis'] || null;
+          let lienSuivi = row['Lien de suivi colis'] || null;
           const statut = row['Statut'] || 'En préparation';
           const timestamp = row['Timestamp'] || new Date().toISOString();
           const reference = row['N° Colis/mois'] || null;
           const notes = row['Note'] || null;
 
-          const colisResult = insertColis.run(
-            lienSuivi,
-            clientId,
-            statut,
-            poidsColis,
-            colisAdresse,
-            null, // adresse_ligne2
-            colisVille,
-            colisCodePostal,
-            colisPays,
-            reference,
-            notes,
-            timestamp
-          );
-          const colisId = colisResult.lastInsertRowid;
+          // Gérer les doublons de numéro de suivi en ajoutant un suffixe
+          let colisId = null;
+          let tentative = 0;
+          const maxTentatives = 100;
+          let numeroSuiviOriginal = lienSuivi;
+
+          while (colisId === null && tentative < maxTentatives) {
+            const numeroSuiviActuel = tentative === 0
+              ? numeroSuiviOriginal
+              : (numeroSuiviOriginal ? `${numeroSuiviOriginal} (+${tentative})` : `SANS-NUMERO (+${tentative})`);
+
+            try {
+              const colisResult = insertColis.run(
+                numeroSuiviActuel,
+                clientId,
+                statut,
+                poidsColis,
+                colisAdresse,
+                null, // adresse_ligne2
+                colisVille,
+                colisCodePostal,
+                colisPays,
+                reference,
+                notes,
+                timestamp
+              );
+              colisId = colisResult.lastInsertRowid;
+
+              // Si on a dû ajouter un suffixe, garder trace
+              if (tentative > 0) {
+                console.log(`⚠️  Numéro de suivi dupliqué ligne ${index + 1}: ${numeroSuiviOriginal} → ${numeroSuiviActuel}`);
+              }
+
+              // Succès, sortir de la boucle
+              break;
+            } catch (insertErr) {
+              // Vérifier si c'est une erreur de contrainte UNIQUE
+              const isUniqueConstraint = insertErr.code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+                                        insertErr.code === 'SQLITE_CONSTRAINT' ||
+                                        (insertErr.message && insertErr.message.toLowerCase().includes('unique'));
+
+              if (isUniqueConstraint) {
+                tentative++;
+                if (tentative >= maxTentatives) {
+                  throw new Error(`Impossible de créer un numéro de suivi unique après ${maxTentatives} tentatives pour: ${numeroSuiviOriginal || 'SANS-NUMERO'}`);
+                }
+                // Continue la boucle pour réessayer avec le prochain suffixe
+              } else {
+                // Autre erreur, la propager
+                throw insertErr;
+              }
+            }
+          }
 
           // ========== GESTION RELATION COLIS-PRODUIT ==========
           if (produitId) {
@@ -325,6 +365,40 @@ app.delete('/api/clients/:id', (req, res) => {
   }
 });
 
+app.post('/api/clients/merge', (req, res) => {
+  const { primaryId, secondaryIds } = req.body;
+
+  if (!primaryId || !secondaryIds || !Array.isArray(secondaryIds) || secondaryIds.length === 0) {
+    return res.status(400).json({ error: 'primaryId et secondaryIds requis' });
+  }
+
+  try {
+    let colisTransferred = 0;
+
+    // Transférer tous les colis des clients secondaires vers le client principal
+    const updateColis = db.prepare('UPDATE colis SET client_id = ? WHERE client_id = ?');
+
+    secondaryIds.forEach(secondaryId => {
+      const result = updateColis.run(primaryId, secondaryId);
+      colisTransferred += result.changes;
+    });
+
+    // Supprimer les clients secondaires
+    const deleteClient = db.prepare('DELETE FROM clients WHERE id = ?');
+    secondaryIds.forEach(secondaryId => {
+      deleteClient.run(secondaryId);
+    });
+
+    res.json({
+      message: 'Clients fusionnés avec succès',
+      merged: secondaryIds.length,
+      colisTransferred
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============= ROUTES PRODUITS =============
 
 app.get('/api/produits', (req, res) => {
@@ -337,13 +411,13 @@ app.get('/api/produits', (req, res) => {
 });
 
 app.post('/api/produits', (req, res) => {
-  const { nom, description, prix, poids, stock, dimension_id } = req.body;
+  const { nom, ref, description, prix, poids, stock, dimension_id } = req.body;
 
   try {
     const result = db.prepare(
-      `INSERT INTO produits (nom, description, prix, poids, stock, dimension_id)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(nom, description, prix, poids, stock || 0, dimension_id || null);
+      `INSERT INTO produits (nom, ref, description, prix, poids, stock, dimension_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(nom, ref || null, description, prix, poids, stock || 0, dimension_id || null);
 
     res.json({ id: result.lastInsertRowid, message: 'Produit créé avec succès' });
   } catch (err) {
@@ -352,14 +426,14 @@ app.post('/api/produits', (req, res) => {
 });
 
 app.put('/api/produits/:id', (req, res) => {
-  const { nom, description, prix, poids, stock, dimension_id } = req.body;
+  const { nom, ref, description, prix, poids, stock, dimension_id } = req.body;
 
   try {
     const result = db.prepare(
       `UPDATE produits
-       SET nom=?, description=?, prix=?, poids=?, stock=?, dimension_id=?
+       SET nom=?, ref=?, description=?, prix=?, poids=?, stock=?, dimension_id=?
        WHERE id=?`
-    ).run(nom, description, prix, poids, stock, dimension_id || null, req.params.id);
+    ).run(nom, ref || null, description, prix, poids, stock, dimension_id || null, req.params.id);
 
     res.json({ message: 'Produit mis à jour', changes: result.changes });
   } catch (err) {
@@ -371,6 +445,53 @@ app.delete('/api/produits/:id', (req, res) => {
   try {
     const result = db.prepare('DELETE FROM produits WHERE id = ?').run(req.params.id);
     res.json({ message: 'Produit supprimé', changes: result.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/produits/merge', (req, res) => {
+  const { primaryId, secondaryIds } = req.body;
+
+  if (!primaryId || !secondaryIds || !Array.isArray(secondaryIds) || secondaryIds.length === 0) {
+    return res.status(400).json({ error: 'primaryId et secondaryIds requis' });
+  }
+
+  try {
+    let relationsTransferred = 0;
+
+    // Transférer toutes les relations colis_produits vers le produit principal
+    const updateColisProduits = db.prepare('UPDATE colis_produits SET produit_id = ? WHERE produit_id = ?');
+
+    secondaryIds.forEach(secondaryId => {
+      const result = updateColisProduits.run(primaryId, secondaryId);
+      relationsTransferred += result.changes;
+    });
+
+    // Additionner les stocks des produits secondaires au produit principal
+    const getStock = db.prepare('SELECT stock FROM produits WHERE id = ?');
+    let totalStock = getStock.get(primaryId)?.stock || 0;
+
+    secondaryIds.forEach(secondaryId => {
+      const secondaryStock = getStock.get(secondaryId)?.stock || 0;
+      totalStock += secondaryStock;
+    });
+
+    // Mettre à jour le stock du produit principal
+    db.prepare('UPDATE produits SET stock = ? WHERE id = ?').run(totalStock, primaryId);
+
+    // Supprimer les produits secondaires
+    const deleteProduit = db.prepare('DELETE FROM produits WHERE id = ?');
+    secondaryIds.forEach(secondaryId => {
+      deleteProduit.run(secondaryId);
+    });
+
+    res.json({
+      message: 'Produits fusionnés avec succès',
+      merged: secondaryIds.length,
+      relationsTransferred,
+      totalStock
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
