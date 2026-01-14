@@ -217,21 +217,24 @@ body::before {
 .nav-badge {
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 600;
     padding: 3px 8px;
-    background: var(--accent-cyan);
-    color: #000;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
     border-radius: 12px;
     margin-left: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .nav-item:hover .nav-badge {
-    background: var(--accent-green);
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-primary);
 }
 
 .nav-item.active .nav-badge {
-    background: var(--accent-cyan);
-    box-shadow: 0 0 10px rgba(0, 217, 255, 0.4);
+    background: rgba(0, 217, 255, 0.15);
+    color: var(--accent-cyan);
+    border-color: rgba(0, 217, 255, 0.3);
 }
 
 /* Navigation Bottom (Settings) */

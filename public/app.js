@@ -1097,18 +1097,39 @@ function filterColis() {
             return true;
         }
 
-        // Rechercher dans les liens des produits
+        // Rechercher dans les noms de produits
         if (c.produits && c.produits.length > 0) {
-            const hasMatchingLink = c.produits.some(p =>
-                p.lien && p.lien.toLowerCase().includes(searchTerm)
-            );
-            if (hasMatchingLink) return true;
+            const hasMatchingProduct = c.produits.some(p => {
+                const nomMatch = p.nom && p.nom.toLowerCase().includes(searchTerm);
+                const lienMatch = p.lien && p.lien.toLowerCase().includes(searchTerm);
+                return nomMatch || lienMatch;
+            });
+            if (hasMatchingProduct) return true;
+        }
+
+        // Rechercher dans les informations du client
+        const clientNom = c.client_nom ? c.client_nom.toLowerCase() : '';
+        const clientPrenom = c.client_prenom ? c.client_prenom.toLowerCase() : '';
+        const clientPseudo = c.client_pseudo ? c.client_pseudo.toLowerCase() : '';
+        if (clientNom.includes(searchTerm) || clientPrenom.includes(searchTerm) || clientPseudo.includes(searchTerm)) {
+            return true;
+        }
+
+        // Rechercher dans l'adresse, ville, pays
+        const adresse = c.adresse_expedition ? c.adresse_expedition.toLowerCase() : '';
+        const ville = c.ville_expedition ? c.ville_expedition.toLowerCase() : '';
+        const pays = c.pays_expedition ? c.pays_expedition.toLowerCase() : '';
+        if (adresse.includes(searchTerm) || ville.includes(searchTerm) || pays.includes(searchTerm)) {
+            return true;
         }
 
         // Rechercher aussi dans les notes (pour les anciens colis)
         if (c.notes) {
             const notesData = parseNotesData(c.notes);
             if (notesData.lien && notesData.lien.toLowerCase().includes(searchTerm)) {
+                return true;
+            }
+            if (notesData.item && notesData.item.toLowerCase().includes(searchTerm)) {
                 return true;
             }
         }
@@ -1177,20 +1198,27 @@ function renderColisRow(c, section) {
     `;
 
     return `
-        <tr class="${rowClass}">
-            <td><input type="checkbox" class="colis-checkbox colis-checkbox-${section}" value="${c.id}" onchange="updateSelection()"></td>
+        <tr class="${rowClass}" style="cursor: pointer;" onclick="handleColisRowClick(event, ${c.id})">
+            <td onclick="event.stopPropagation()"><input type="checkbox" class="colis-checkbox colis-checkbox-${section}" value="${c.id}" onchange="updateSelection()"></td>
             <td>${dateStr}</td>
             <td>${produitHtml}</td>
             <td>${clientHtml}</td>
             <td><span class="badge badge-${getStatutClass(c.statut)}">${c.statut}</span></td>
             <td>${c.poids ? c.poids + ' kg' : '-'}</td>
             <td><strong>${c.numero_suivi || 'XXXX-XXXX'}</strong></td>
-            <td class="actions">
-                <button class="btn btn-edit btn-small" onclick="editColis(${c.id})">✏️</button>
+            <td class="actions" onclick="event.stopPropagation()">
                 <button class="btn btn-danger btn-small" onclick="deleteColis(${c.id})">🗑️</button>
             </td>
         </tr>
     `;
+}
+
+function handleColisRowClick(event, colisId) {
+    // Prevent opening if clicking on interactive elements
+    if (event.target.closest('button') || event.target.closest('input') || event.target.closest('a') || event.target.closest('.produit-clickable') || event.target.closest('.client-name')) {
+        return;
+    }
+    editColis(colisId);
 }
 
 function getStatutClass(statut) {

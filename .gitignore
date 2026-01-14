@@ -3,6 +3,18 @@ node_modules/
 
 # Database
 *.db
+data/
+
+# CSV files (peuvent contenir des données clients)
+*.csv
+
+# Dossiers confidentiels
+Confidential/
+
+# Scripts d'import temporaires
+*import*.py
+clean_and_dedupe.py
+test_csv_parse.js
 
 # Uploads
 uploads/
@@ -16,3 +28,6 @@ uploads/
 # OS files
 .DS_Store
 Thumbs.db
+
+# NPM cache
+.npm-cache/

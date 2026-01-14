@@ -83,7 +83,7 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
       }
 
       // Prepared statements
-      const findClientByEmail = db.prepare('SELECT id FROM clients WHERE email = ? AND email IS NOT NULL AND email != ""');
+      const findClientByEmail = db.prepare("SELECT id FROM clients WHERE email = ? AND email IS NOT NULL AND email != ''");
       const findClientByName = db.prepare('SELECT id FROM clients WHERE nom = ? AND prenom = ?');
       const insertClient = db.prepare(
         `INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, code_postal, pays, pseudo, wallet, lien)
@@ -130,16 +130,33 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
 
           // Créer le client si nécessaire
           if (!clientId) {
-            const adresseData = parseAdresse(row["Adresse d'envoi"] || '');
+            // Utiliser les colonnes séparées si disponibles, sinon parser l'adresse
+            let adresseVal, villeVal, codePostalVal, paysVal;
+
+            if (row['Client Ville'] || row['Client Code Postal'] || row['Client Pays']) {
+              // Utiliser les champs séparés fournis dans le CSV
+              adresseVal = row["Adresse d'envoi"] || null;
+              villeVal = row['Client Ville'] || null;
+              codePostalVal = row['Client Code Postal'] || null;
+              paysVal = row['Client Pays'] || 'France';
+            } else {
+              // Fallback: parser l'adresse complète
+              const adresseData = parseAdresse(row["Adresse d'envoi"] || '');
+              adresseVal = adresseData.adresse || null;
+              villeVal = adresseData.ville || null;
+              codePostalVal = adresseData.code_postal || null;
+              paysVal = adresseData.pays || 'France';
+            }
+
             const clientResult = insertClient.run(
               clientNom,
               clientPrenom || null,
               clientEmail || null,
               row['Client Telephone'] || null,
-              adresseData.adresse || null,
-              adresseData.ville || null,
-              adresseData.code_postal || null,
-              adresseData.pays || 'France',
+              adresseVal,
+              villeVal,
+              codePostalVal,
+              paysVal,
               row['Client Pseudo'] || null,
               row['Client Wallet'] || null,
               row['Client Lien'] || null
@@ -177,7 +194,24 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
           }
 
           // ========== GESTION COLIS ==========
-          const adresseData = parseAdresse(row["Adresse d'envoi"] || '');
+          // Utiliser les colonnes séparées si disponibles, sinon parser l'adresse
+          let colisAdresse, colisVille, colisCodePostal, colisPays;
+
+          if (row['Client Ville'] || row['Client Code Postal'] || row['Client Pays']) {
+            // Utiliser les champs séparés fournis dans le CSV
+            colisAdresse = row["Adresse d'envoi"] || null;
+            colisVille = row['Client Ville'] || null;
+            colisCodePostal = row['Client Code Postal'] || null;
+            colisPays = row['Client Pays'] || 'France';
+          } else {
+            // Fallback: parser l'adresse complète
+            const adresseData = parseAdresse(row["Adresse d'envoi"] || '');
+            colisAdresse = adresseData.adresse || null;
+            colisVille = adresseData.ville || null;
+            colisCodePostal = adresseData.code_postal || null;
+            colisPays = adresseData.pays || 'France';
+          }
+
           const poidsColis = parseFloat(row['Poids (kg)'] || row['Poids'] || 0) || null;
           const lienSuivi = row['Lien de suivi colis'] || null;
           const statut = row['Statut'] || 'En préparation';
@@ -190,11 +224,11 @@ app.post('/api/import/csv', upload.single('csvFile'), (req, res) => {
             clientId,
             statut,
             poidsColis,
-            adresseData.adresse || null,
+            colisAdresse,
             null, // adresse_ligne2
-            adresseData.ville || null,
-            adresseData.code_postal || null,
-            adresseData.pays || 'France',
+            colisVille,
+            colisCodePostal,
+            colisPays,
             reference,
             notes,
             timestamp
