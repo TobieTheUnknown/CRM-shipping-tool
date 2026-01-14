@@ -321,6 +321,12 @@ async function viewClientDetails(clientId) {
             if (client.lien) liens = [client.lien];
         }
 
+        // Filtrer les colis de ce client
+        const clientColis = colis.filter(c => c.client_id === clientId);
+        const colisEnPreparation = clientColis.filter(c => c.statut === 'En préparation');
+        const colisProblematiques = clientColis.filter(c => c.statut === 'Out of stock' || c.statut === 'Incomplet');
+        const colisEnvoyes = clientColis.filter(c => c.statut === 'Envoyé');
+
         // Générer le HTML pour les wallets
         const walletsHtml = wallets.length > 0 ? `
             <div>
@@ -336,6 +342,97 @@ async function viewClientDetails(clientId) {
                 ${liens.map(l => `<a href="${l}" target="_blank" class="product-link" style="display: block; margin-top: 5px;">${l}</a>`).join('')}
             </div>
         ` : '';
+
+        // Fonction pour générer le HTML d'un colis
+        const renderClientColisRow = (c) => {
+            const date = new Date(c.date_creation);
+            const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+            // Nom des produits
+            let produitsNom = '-';
+            if (c.produits && c.produits.length > 0) {
+                const nomsProduitsArr = c.produits.map(p => p.nom || 'Produit');
+                produitsNom = nomsProduitsArr.length > 2
+                    ? nomsProduitsArr.slice(0, 2).join(', ') + ` (+${nomsProduitsArr.length - 2})`
+                    : nomsProduitsArr.join(', ');
+            } else if (c.notes) {
+                const notesData = parseNotesData(c.notes);
+                if (notesData.item) produitsNom = notesData.item;
+            }
+
+            return `
+                <tr style="cursor: pointer;" onclick="editColis(${c.id}); closeModal('modalClientDetails');" title="Cliquer pour éditer">
+                    <td>${dateStr}</td>
+                    <td>${produitsNom}</td>
+                    <td><span class="badge badge-${getStatutClass(c.statut)}">${c.statut}</span></td>
+                    <td><strong>${c.numero_suivi || 'XXXX-XXXX'}</strong></td>
+                </tr>
+            `;
+        };
+
+        // Générer le HTML pour les colis
+        const colisHtml = clientColis.length > 0 ? `
+            <div style="margin-top: 20px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                <h3 style="margin-bottom: 15px; font-size: 16px;">📦 Colis associés (${clientColis.length})</h3>
+
+                ${colisEnPreparation.length > 0 ? `
+                    <div style="margin-bottom: 15px;">
+                        <h4 style="font-size: 14px; color: var(--accent-blue); margin-bottom: 8px;">En préparation (${colisEnPreparation.length})</h4>
+                        <table class="colisTable" style="width: 100%; font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Produit(s)</th>
+                                    <th>Statut</th>
+                                    <th>N° Suivi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${colisEnPreparation.map(renderClientColisRow).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : ''}
+
+                ${colisProblematiques.length > 0 ? `
+                    <div style="margin-bottom: 15px;">
+                        <h4 style="font-size: 14px; color: var(--accent-orange); margin-bottom: 8px;">Problématiques (${colisProblematiques.length})</h4>
+                        <table class="colisTable" style="width: 100%; font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Produit(s)</th>
+                                    <th>Statut</th>
+                                    <th>N° Suivi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${colisProblematiques.map(renderClientColisRow).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : ''}
+
+                ${colisEnvoyes.length > 0 ? `
+                    <div style="margin-bottom: 15px;">
+                        <h4 style="font-size: 14px; color: var(--accent-green); margin-bottom: 8px;">Envoyés (${colisEnvoyes.length})</h4>
+                        <table class="colisTable" style="width: 100%; font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Produit(s)</th>
+                                    <th>Statut</th>
+                                    <th>N° Suivi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${colisEnvoyes.map(renderClientColisRow).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : ''}
+            </div>
+        ` : '<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; text-align: center; color: #666;">Aucun colis pour ce client</div>';
 
         const detailsHtml = `
             <div style="display: grid; gap: 15px;">
@@ -360,6 +457,7 @@ async function viewClientDetails(clientId) {
                 ${walletsHtml}
                 ${liensHtml}
             </div>
+            ${colisHtml}
         `;
 
         document.getElementById('clientDetailsContent').innerHTML = detailsHtml;
@@ -847,11 +945,13 @@ async function loadColis() {
     }
 }
 
-function displayColis() {
+function displayColis(filteredList = null) {
+    const listToDisplay = filteredList || colis;
+
     // Séparer les colis en trois catégories
-    const colisEnPreparation = colis.filter(c => c.statut === 'En préparation');
-    const colisProblematiques = colis.filter(c => c.statut === 'Out of stock' || c.statut === 'Incomplet');
-    const colisExpedies = colis.filter(c => c.statut === 'Envoyé');
+    const colisEnPreparation = listToDisplay.filter(c => c.statut === 'En préparation');
+    const colisProblematiques = listToDisplay.filter(c => c.statut === 'Out of stock' || c.statut === 'Incomplet');
+    const colisExpedies = listToDisplay.filter(c => c.statut === 'Envoyé');
 
     // Afficher les compteurs
     document.getElementById('countEnPreparation').textContent = colisEnPreparation.length;
@@ -881,6 +981,42 @@ function displayColis() {
     } else {
         tbodyExpedies.innerHTML = colisExpedies.map(c => renderColisRow(c, 'expedies')).join('');
     }
+}
+
+function filterColis() {
+    const searchTerm = document.getElementById('searchColis').value.toLowerCase().trim();
+
+    if (!searchTerm) {
+        displayColis();
+        return;
+    }
+
+    const filtered = colis.filter(c => {
+        // Rechercher dans le numéro de suivi
+        if (c.numero_suivi && c.numero_suivi.toLowerCase().includes(searchTerm)) {
+            return true;
+        }
+
+        // Rechercher dans les liens des produits
+        if (c.produits && c.produits.length > 0) {
+            const hasMatchingLink = c.produits.some(p =>
+                p.lien && p.lien.toLowerCase().includes(searchTerm)
+            );
+            if (hasMatchingLink) return true;
+        }
+
+        // Rechercher aussi dans les notes (pour les anciens colis)
+        if (c.notes) {
+            const notesData = parseNotesData(c.notes);
+            if (notesData.lien && notesData.lien.toLowerCase().includes(searchTerm)) {
+                return true;
+            }
+        }
+
+        return false;
+    });
+
+    displayColis(filtered);
 }
 
 function parseNotesData(notes) {
