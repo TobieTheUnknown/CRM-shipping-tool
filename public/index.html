@@ -298,12 +298,12 @@
                             <thead>
                                 <tr>
                                     <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('preparation')"></th>
-                                    <th>Date</th>
-                                    <th>Produit</th>
-                                    <th>Client / Adresse</th>
-                                    <th>Statut</th>
-                                    <th>Poids</th>
-                                    <th>N° Suivi</th>
+                                    <th class="sortable" data-sort="date" onclick="sortColis('date', 'preparation')">Date <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="produit" onclick="sortColis('produit', 'preparation')">Produit <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="client" onclick="sortColis('client', 'preparation')">Client / Adresse <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="statut" onclick="sortColis('statut', 'preparation')">Statut <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="poids" onclick="sortColis('poids', 'preparation')">Poids <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="numero_suivi" onclick="sortColis('numero_suivi', 'preparation')">N° Suivi <span class="sort-icon"></span></th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -325,12 +325,12 @@
                             <thead>
                                 <tr>
                                     <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('problematiques')"></th>
-                                    <th>Date</th>
-                                    <th>Produit</th>
-                                    <th>Client / Adresse</th>
-                                    <th>Statut</th>
-                                    <th>Poids</th>
-                                    <th>N° Suivi</th>
+                                    <th class="sortable" data-sort="date" onclick="sortColis('date', 'problematiques')">Date <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="produit" onclick="sortColis('produit', 'problematiques')">Produit <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="client" onclick="sortColis('client', 'problematiques')">Client / Adresse <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="statut" onclick="sortColis('statut', 'problematiques')">Statut <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="poids" onclick="sortColis('poids', 'problematiques')">Poids <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="numero_suivi" onclick="sortColis('numero_suivi', 'problematiques')">N° Suivi <span class="sort-icon"></span></th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -355,12 +355,12 @@
                             <thead>
                                 <tr>
                                     <th><input type="checkbox" class="select-all" onchange="toggleSelectAll('expedies')"></th>
-                                    <th>Date</th>
-                                    <th>Produit</th>
-                                    <th>Client / Adresse</th>
-                                    <th>Statut</th>
-                                    <th>Poids</th>
-                                    <th>N° Suivi</th>
+                                    <th class="sortable" data-sort="date" onclick="sortColis('date', 'expedies')">Date <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="produit" onclick="sortColis('produit', 'expedies')">Produit <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="client" onclick="sortColis('client', 'expedies')">Client / Adresse <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="statut" onclick="sortColis('statut', 'expedies')">Statut <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="poids" onclick="sortColis('poids', 'expedies')">Poids <span class="sort-icon"></span></th>
+                                    <th class="sortable" data-sort="numero_suivi" onclick="sortColis('numero_suivi', 'expedies')">N° Suivi <span class="sort-icon"></span></th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -396,12 +396,12 @@
                         <thead>
                             <tr>
                                 <th><input type="checkbox" id="selectAllClients" onchange="toggleSelectAllClients()"></th>
-                                <th>Pseudo</th>
-                                <th>Nom</th>
-                                <th>Prénom</th>
-                                <th>Email</th>
-                                <th>Téléphone</th>
-                                <th>Ville</th>
+                                <th class="sortable" data-sort="pseudo" onclick="sortClients('pseudo')">Pseudo <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="nom" onclick="sortClients('nom')">Nom <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="prenom" onclick="sortClients('prenom')">Prénom <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="email" onclick="sortClients('email')">Email <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="telephone" onclick="sortClients('telephone')">Téléphone <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="ville" onclick="sortClients('ville')">Ville <span class="sort-icon"></span></th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -436,12 +436,12 @@
                         <thead>
                             <tr>
                                 <th><input type="checkbox" id="selectAllProduits" onchange="toggleSelectAllProduits()"></th>
-                                <th>Nom</th>
-                                <th>Réf.</th>
-                                <th>Description</th>
-                                <th>Prix</th>
-                                <th>Poids</th>
-                                <th>Stock</th>
+                                <th class="sortable" data-sort="nom" onclick="sortProduits('nom')">Nom <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="ref" onclick="sortProduits('ref')">Réf. <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="description" onclick="sortProduits('description')">Description <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="prix" onclick="sortProduits('prix')">Prix <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="poids" onclick="sortProduits('poids')">Poids <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="stock" onclick="sortProduits('stock')">Stock <span class="sort-icon"></span></th>
                                 <th>Actions</th>
                             </tr>
                         </thead>

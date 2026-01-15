@@ -1868,3 +1868,48 @@ input[type="checkbox"] {
     color: var(--text-muted);
     font-size: 14px;
 }
+
+/* ============= SORTABLE COLUMNS ============= */
+
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+    position: relative;
+    padding-right: 24px !important;
+}
+
+th.sortable:hover {
+    background: rgba(0, 217, 255, 0.1);
+    color: var(--accent-cyan);
+}
+
+th.sortable .sort-icon {
+    display: inline-block;
+    margin-left: 6px;
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+th.sortable .sort-icon::after {
+    content: '';
+    font-size: 14px;
+}
+
+th.sortable.sort-asc .sort-icon {
+    opacity: 1;
+    color: var(--accent-cyan);
+}
+
+th.sortable.sort-asc .sort-icon::after {
+    content: '↑';
+}
+
+th.sortable.sort-desc .sort-icon {
+    opacity: 1;
+    color: var(--accent-cyan);
+}
+
+th.sortable.sort-desc .sort-icon::after {
+    content: '↓';
+}

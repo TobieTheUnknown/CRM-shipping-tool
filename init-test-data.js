@@ -287,9 +287,10 @@ function insertClients() {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
+  const clientIds = [];
   clients.forEach((client) => {
     try {
-      stmt.run(
+      const result = stmt.run(
         client.pseudo || null,
         client.nom,
         client.prenom,
@@ -302,11 +303,13 @@ function insertClients() {
         client.wallet || null,
         client.lien || null
       );
+      clientIds.push(result.lastInsertRowid);
       console.log(`✓ Client créé: ${client.pseudo ? client.pseudo + ' - ' : ''}${client.nom} ${client.prenom} (${client.pays})`);
     } catch (err) {
       console.error(`Erreur insertion client ${client.nom}:`, err.message);
     }
   });
+  return clientIds;
 }
 
 // Fonction pour insérer les produits
@@ -317,18 +320,21 @@ function insertProduits() {
     VALUES (?, ?, ?, ?, ?)
   `);
 
+  const produitIds = [];
   produits.forEach((produit) => {
     try {
-      stmt.run(produit.nom, produit.description, produit.prix, produit.poids, produit.stock);
+      const result = stmt.run(produit.nom, produit.description, produit.prix, produit.poids, produit.stock);
+      produitIds.push(result.lastInsertRowid);
       console.log(`✓ Produit créé: ${produit.nom} - ${produit.prix}€`);
     } catch (err) {
       console.error(`Erreur insertion produit ${produit.nom}:`, err.message);
     }
   });
+  return produitIds;
 }
 
 // Fonction pour insérer les colis
-function insertColis() {
+function insertColis(clientIds, produitIds) {
   console.log('\n--- Création des colis ---');
   const stmtColis = db.prepare(`
     INSERT INTO colis (
@@ -345,10 +351,13 @@ function insertColis() {
 
   colisData.forEach((colis) => {
     try {
-      const client = clients[colis.client_id - 1];
+      const clientIndex = colis.client_id - 1;
+      const client = clients[clientIndex];
+      const realClientId = clientIds[clientIndex];
+
       const result = stmtColis.run(
         colis.numero_suivi,
-        colis.client_id,
+        realClientId,
         colis.statut,
         colis.poids,
         colis.dimensions,
@@ -368,9 +377,10 @@ function insertColis() {
       // Insérer les produits associés
       if (colis.produits && colis.produits.length > 0) {
         colis.produits.forEach((produit) => {
+          const realProduitId = produitIds[produit.produit_id - 1];
           stmtColisProduits.run(
             colisId,
-            produit.produit_id,
+            realProduitId,
             produit.quantite || 1,
             produit.lien || null
           );
@@ -388,9 +398,9 @@ function insertColis() {
 // Exécution
 function init() {
   try {
-    insertClients();
-    insertProduits();
-    insertColis();
+    const clientIds = insertClients();
+    const produitIds = insertProduits();
+    insertColis(clientIds, produitIds);
     console.log('\n✅ Toutes les données de test ont été créées avec succès!\n');
     process.exit(0);
   } catch (error) {

@@ -10,6 +10,13 @@ let selectedColis = new Set();
 let colisProduitsSelection = []; // Produits sélectionnés pour le colis en cours
 let selectedTimbreId = null; // Timbre sélectionné pour le colis en cours
 
+// État du tri des tableaux
+let sortState = {
+    colis: { preparation: {}, problematiques: {}, expedies: {} },
+    clients: {},
+    produits: {}
+};
+
 // ============= TOAST NOTIFICATIONS =============
 
 function showToast(message, type = 'success', title = null, duration = 3000) {
@@ -292,6 +299,234 @@ document.addEventListener('click', function(event) {
         }
     }
 });
+
+// ============= TABLE SORTING =============
+
+function updateSortIcon(tableId, column, section = null) {
+    // Construire le sélecteur de tableau
+    let selector = '';
+    if (tableId === 'colis') {
+        const sectionMap = {
+            'preparation': 'colisEnPreparationBody',
+            'problematiques': 'colisProblematiquesBody',
+            'expedies': 'colisExpediesBody'
+        };
+        selector = `#${sectionMap[section]}`.replace('Body', '');
+    } else if (tableId === 'clients') {
+        selector = '#clientsTable';
+    } else if (tableId === 'produits') {
+        selector = '#produitsTable';
+    }
+
+    // Retirer les classes de tri de toutes les colonnes du tableau
+    const table = document.querySelector(selector);
+    if (table) {
+        table.querySelectorAll('th.sortable').forEach(th => {
+            th.classList.remove('sort-asc', 'sort-desc');
+        });
+
+        // Ajouter la classe appropriée à la colonne triée
+        const state = section ? sortState[tableId][section] : sortState[tableId];
+        const th = table.querySelector(`th.sortable[data-sort="${column}"]`);
+        if (th && state.column === column) {
+            th.classList.add(state.order === 'asc' ? 'sort-asc' : 'sort-desc');
+        }
+    }
+}
+
+function sortArray(array, column, order) {
+    return array.sort((a, b) => {
+        let aVal = a[column];
+        let bVal = b[column];
+
+        // Gérer les valeurs nulles/undefined
+        if (aVal == null) aVal = '';
+        if (bVal == null) bVal = '';
+
+        // Convertir en minuscules pour les chaînes
+        if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+        if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+
+        // Tri spécial pour les dates
+        if (column === 'date' || column === 'created_at') {
+            aVal = new Date(a[column] || 0).getTime();
+            bVal = new Date(b[column] || 0).getTime();
+        }
+
+        // Tri numérique pour poids, prix, stock
+        if (column === 'poids' || column === 'prix' || column === 'stock') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
+        }
+
+        if (order === 'asc') {
+            return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        } else {
+            return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+        }
+    });
+}
+
+// ============= SORT COLIS =============
+
+function sortColis(column, section) {
+    const state = sortState.colis[section];
+
+    // Déterminer l'ordre (toggle ou nouveau tri)
+    if (state.column === column) {
+        state.order = state.order === 'asc' ? 'desc' : 'asc';
+    } else {
+        state.column = column;
+        state.order = 'asc';
+    }
+
+    // Trier les données
+    let colisToSort;
+    if (section === 'preparation') {
+        colisToSort = colis.filter(c => c.statut === 'En préparation');
+    } else if (section === 'problematiques') {
+        colisToSort = colis.filter(c => c.statut === 'Out of stock' || c.statut === 'Incomplet');
+    } else {
+        colisToSort = colis.filter(c => c.statut === 'Envoyé');
+    }
+
+    // Adapter le nom de colonne pour correspondre aux données
+    let sortColumn = column;
+    if (column === 'produit') {
+        // Trier par le nom du premier produit
+        colisToSort = colisToSort.sort((a, b) => {
+            const aProduit = a.produits && a.produits[0] ? a.produits[0].nom : '';
+            const bProduit = b.produits && b.produits[0] ? b.produits[0].nom : '';
+            const aVal = aProduit.toLowerCase();
+            const bVal = bProduit.toLowerCase();
+            return state.order === 'asc'
+                ? (aVal > bVal ? 1 : aVal < bVal ? -1 : 0)
+                : (aVal < bVal ? 1 : aVal > bVal ? -1 : 0);
+        });
+    } else if (column === 'client') {
+        // Trier par le nom du client
+        colisToSort = colisToSort.sort((a, b) => {
+            const aClient = clients.find(c => c.id === a.client_id);
+            const bClient = clients.find(c => c.id === b.client_id);
+            const aVal = aClient ? formatClientName(aClient).toLowerCase() : '';
+            const bVal = bClient ? formatClientName(bClient).toLowerCase() : '';
+            return state.order === 'asc'
+                ? (aVal > bVal ? 1 : aVal < bVal ? -1 : 0)
+                : (aVal < bVal ? 1 : aVal > bVal ? -1 : 0);
+        });
+    } else if (column === 'date') {
+        sortColumn = 'created_at';
+        colisToSort = sortArray(colisToSort, sortColumn, state.order);
+    } else {
+        colisToSort = sortArray(colisToSort, sortColumn, state.order);
+    }
+
+    // Afficher les données triées
+    displayColisBySection(colisToSort, section);
+
+    // Mettre à jour l'icône de tri
+    updateSortIcon('colis', column, section);
+}
+
+function displayColisBySection(colisList, section) {
+    const bodyId = section === 'preparation' ? 'colisEnPreparationBody'
+                 : section === 'problematiques' ? 'colisProblematiquesBody'
+                 : 'colisExpediesBody';
+    const tbody = document.getElementById(bodyId);
+
+    if (colisList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">Aucun colis</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = colisList.map(c => {
+        const client = clients.find(cl => cl.id === c.client_id);
+        const clientName = client ? formatClientName(client, true) : 'Client inconnu';
+        const adresse = `${c.ville_expedition || ''}${c.ville_expedition && c.pays_expedition ? ', ' : ''}${c.pays_expedition || ''}`;
+
+        // Formater les produits
+        let produitHtml = '';
+        if (c.produits && c.produits.length > 0) {
+            const nomsProduitsArr = c.produits.map(p => p.nom || 'Produit');
+            const nomsProduits = nomsProduitsArr.length > 2
+                ? nomsProduitsArr.slice(0, 2).join(', ') + ` (+${nomsProduitsArr.length - 2})`
+                : nomsProduitsArr.join(', ');
+            produitHtml = `<span class="product-name produit-clickable" onclick="handleProduitClick(${c.id})" title="Cliquez pour voir les détails">${nomsProduits}</span>`;
+        } else {
+            produitHtml = '<span style="color: #999;">-</span>';
+        }
+
+        const statusClass = getStatutClass(c.statut);
+        const lienSuivi = c.numero_suivi
+            ? `https://www.laposte.fr/outils/suivre-vos-envois?code=${c.numero_suivi}`
+            : '#';
+
+        const isNonFrance = (c.pays_expedition && c.pays_expedition.toLowerCase() !== 'france');
+        const rowClass = isNonFrance ? 'non-france' : '';
+
+        return `
+            <tr class="${rowClass}" style="cursor: pointer;" onclick="handleColisRowClick(event, ${c.id})">
+                <td onclick="event.stopPropagation()">
+                    <input type="checkbox" class="colis-checkbox colis-checkbox-${section}" value="${c.id}" onchange="updateSelection()">
+                </td>
+                <td>${new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
+                <td>${produitHtml}</td>
+                <td>
+                    <span class="client-name" style="cursor: pointer; color: #667eea;" onclick="viewClientDetails(${c.client_id})">${clientName}</span>
+                    <span class="client-address">${adresse}</span>
+                </td>
+                <td><span class="badge badge-${statusClass}">${c.statut}</span></td>
+                <td>${c.poids ? c.poids + ' kg' : '-'}</td>
+                <td><strong>${c.numero_suivi || 'XXXX-XXXX'}</strong></td>
+                <td class="actions" onclick="event.stopPropagation()">
+                    <button class="btn btn-danger btn-small" onclick="deleteColis(${c.id})">🗑️</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// ============= SORT CLIENTS =============
+
+function sortClients(column) {
+    const state = sortState.clients;
+
+    // Déterminer l'ordre
+    if (state.column === column) {
+        state.order = state.order === 'asc' ? 'desc' : 'asc';
+    } else {
+        state.column = column;
+        state.order = 'asc';
+    }
+
+    // Trier et afficher
+    const sorted = sortArray([...clients], column, state.order);
+    displayClients(sorted);
+
+    // Mettre à jour l'icône
+    updateSortIcon('clients', column);
+}
+
+// ============= SORT PRODUITS =============
+
+function sortProduits(column) {
+    const state = sortState.produits;
+
+    // Déterminer l'ordre
+    if (state.column === column) {
+        state.order = state.order === 'asc' ? 'desc' : 'asc';
+    } else {
+        state.column = column;
+        state.order = 'asc';
+    }
+
+    // Trier et afficher
+    const sorted = sortArray([...produits], column, state.order);
+    displayProduits(sorted);
+
+    // Mettre à jour l'icône
+    updateSortIcon('produits', column);
+}
 
 function showAddClientModal() {
     document.getElementById('formClient').reset();
