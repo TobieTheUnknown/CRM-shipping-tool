@@ -179,10 +179,119 @@ function filterClients() {
 }
 
 function updateClientSelect() {
-    const select = document.getElementById('colisClientId');
-    select.innerHTML = '<option value="">Sélectionner un client</option>' +
-        clients.map(c => `<option value="${c.id}">${formatClientName(c, true)}</option>`).join('');
+    // Cette fonction n'est plus utilisée pour le select, mais on la garde pour la compatibilité
+    // Le nouveau système utilise clientSearchInput avec dropdown
 }
+
+// ============= CLIENT SEARCH DROPDOWN =============
+
+function showClientDropdown() {
+    const dropdown = document.getElementById('clientDropdown');
+    filterClientDropdown();
+    dropdown.style.display = 'block';
+}
+
+function hideClientDropdown() {
+    setTimeout(() => {
+        const dropdown = document.getElementById('clientDropdown');
+        dropdown.style.display = 'none';
+    }, 200);
+}
+
+function filterClientDropdown() {
+    const searchInput = document.getElementById('clientSearchInput');
+    const dropdown = document.getElementById('clientDropdown');
+    const searchTerm = searchInput.value.toLowerCase().trim();
+
+    // Filtrer les clients par nom, prénom ou pseudo
+    const filteredClients = clients.filter(client => {
+        const pseudo = (client.pseudo || '').toLowerCase();
+        const nom = (client.nom || '').toLowerCase();
+        const prenom = (client.prenom || '').toLowerCase();
+        const ville = (client.ville || '').toLowerCase();
+
+        return pseudo.includes(searchTerm) ||
+               nom.includes(searchTerm) ||
+               prenom.includes(searchTerm) ||
+               ville.includes(searchTerm);
+    });
+
+    // Trier les clients par pertinence (correspondances exactes en premier)
+    filteredClients.sort((a, b) => {
+        const aScore = getClientMatchScore(a, searchTerm);
+        const bScore = getClientMatchScore(b, searchTerm);
+        return bScore - aScore;
+    });
+
+    // Afficher les résultats
+    if (filteredClients.length === 0) {
+        dropdown.innerHTML = '<div class="client-dropdown-empty">Aucun client trouvé</div>';
+    } else {
+        const selectedClientId = document.getElementById('colisClientId').value;
+        dropdown.innerHTML = filteredClients.map(client => {
+            const isSelected = client.id == selectedClientId;
+            const details = [];
+            if (client.ville) details.push(client.ville);
+            if (client.email) details.push(client.email);
+
+            return `
+                <div class="client-dropdown-item ${isSelected ? 'selected' : ''}"
+                     onclick="selectClient(${client.id})"
+                     data-client-id="${client.id}">
+                    <div class="client-dropdown-item-name">${formatClientName(client, true)}</div>
+                    ${details.length > 0 ? `<div class="client-dropdown-item-details">${details.join(' • ')}</div>` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    dropdown.style.display = 'block';
+}
+
+function getClientMatchScore(client, searchTerm) {
+    let score = 0;
+    const pseudo = (client.pseudo || '').toLowerCase();
+    const nom = (client.nom || '').toLowerCase();
+    const prenom = (client.prenom || '').toLowerCase();
+
+    // Score plus élevé pour les correspondances exactes au début
+    if (pseudo.startsWith(searchTerm)) score += 100;
+    if (nom.startsWith(searchTerm)) score += 90;
+    if (prenom.startsWith(searchTerm)) score += 85;
+
+    // Score moyen pour les correspondances partielles
+    if (pseudo.includes(searchTerm)) score += 50;
+    if (nom.includes(searchTerm)) score += 45;
+    if (prenom.includes(searchTerm)) score += 40;
+
+    return score;
+}
+
+function selectClient(clientId) {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    // Mettre à jour les champs
+    document.getElementById('colisClientId').value = clientId;
+    document.getElementById('clientSearchInput').value = formatClientName(client, true);
+
+    // Remplir l'adresse automatiquement
+    fillClientAddress();
+
+    // Fermer le dropdown
+    hideClientDropdown();
+}
+
+// Fermer le dropdown si on clique ailleurs
+document.addEventListener('click', function(event) {
+    const searchContainer = document.querySelector('.client-search-container');
+    if (searchContainer && !searchContainer.contains(event.target)) {
+        const dropdown = document.getElementById('clientDropdown');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+    }
+});
 
 function showAddClientModal() {
     document.getElementById('formClient').reset();
@@ -722,6 +831,12 @@ async function confirmQuickClient() {
             // Sélectionner le nouveau client dans le formulaire de colis
             document.getElementById('colisClientId').value = result.id;
 
+            // Mettre à jour le champ de recherche avec le nom du nouveau client
+            const newClient = clients.find(c => c.id === result.id);
+            if (newClient) {
+                document.getElementById('clientSearchInput').value = formatClientName(newClient, true);
+            }
+
             // Remplir l'adresse automatiquement
             fillClientAddress();
 
@@ -1245,6 +1360,9 @@ function getStatutClass(statut) {
 async function showAddColisModal() {
     document.getElementById('formColis').reset();
     document.getElementById('colisId').value = '';
+    // Réinitialiser le champ de recherche du client
+    document.getElementById('clientSearchInput').value = '';
+    document.getElementById('colisClientId').value = '';
     // Réinitialiser les produits sélectionnés
     colisProduitsSelection = [];
     displayColisProduitsSelection();
@@ -1345,6 +1463,12 @@ async function editColis(id) {
     }
 
     updateLienSuiviPreview();
+
+    // Mettre à jour le champ de recherche du client
+    const client = clients.find(cl => cl.id == c.client_id);
+    if (client) {
+        document.getElementById('clientSearchInput').value = formatClientName(client, true);
+    }
 
     document.getElementById('modalColis').classList.add('active');
 }

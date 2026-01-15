@@ -1809,3 +1809,62 @@ input[type="checkbox"] {
     flex-direction: column;
     gap: 4px;
 }
+
+/* ============= CLIENT SEARCH DROPDOWN ============= */
+
+.client-search-container {
+    position: relative;
+}
+
+.client-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: var(--shadow-lg);
+}
+
+.client-dropdown-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.client-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.client-dropdown-item:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-cyan);
+}
+
+.client-dropdown-item.selected {
+    background: rgba(0, 217, 255, 0.1);
+    border-left: 3px solid var(--accent-cyan);
+}
+
+.client-dropdown-item-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.client-dropdown-item-details {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.client-dropdown-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+}

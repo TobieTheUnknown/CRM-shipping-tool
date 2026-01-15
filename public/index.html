@@ -645,9 +645,21 @@
                     <div class="form-group" style="flex: 1;">
                         <label>Client *</label>
                         <div style="display: flex; gap: 8px;">
-                            <select id="colisClientId" required onchange="fillClientAddress()" style="flex: 1;">
-                                <option value="">Sélectionner un client</option>
-                            </select>
+                            <div class="client-search-container" style="flex: 1; position: relative;">
+                                <input type="hidden" id="colisClientId" required>
+                                <input
+                                    type="text"
+                                    id="clientSearchInput"
+                                    placeholder="🔍 Rechercher un client (nom, prénom, pseudo)..."
+                                    autocomplete="off"
+                                    oninput="filterClientDropdown()"
+                                    onfocus="showClientDropdown()"
+                                    style="width: 100%;"
+                                >
+                                <div id="clientDropdown" class="client-dropdown" style="display: none;">
+                                    <!-- Options générées dynamiquement -->
+                                </div>
+                            </div>
                             <button type="button" class="btn btn-secondary btn-small" onclick="showQuickClientModal()" title="Créer un client rapidement">
                                 ➕ Créer
                             </button>
