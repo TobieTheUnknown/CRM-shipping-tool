@@ -426,6 +426,9 @@
                         <input type="text" id="searchProduits" placeholder="🔍 Rechercher un produit..." oninput="filterProduits()">
                     </div>
                     <button class="btn btn-primary" onclick="showAddProduitModal()">+ Nouveau Produit</button>
+                    <button class="btn btn-success" onclick="exportProduitsCSV()">
+                        💾 Exporter CSV (<span id="exportProduitsCount">Tous</span>)
+                    </button>
                     <button class="btn btn-success" onclick="showMergeProduitsModal()" id="btnMergeProduits" style="display: none;">
                         🔀 Fusionner (<span id="selectedProduitsCount">0</span>)
                     </button>

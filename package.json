@@ -17,7 +17,7 @@
   "author": "TobieTheUnknown",
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^9.6.0",
+    "better-sqlite3": "^12.6.0",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "csv-parser": "^3.0.0",

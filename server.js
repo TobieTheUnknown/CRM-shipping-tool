@@ -475,6 +475,111 @@ app.delete('/api/produits/:id', (req, res) => {
   }
 });
 
+// Helper functions for CSV export
+function escapeCSVField(field) {
+  if (field === null || field === undefined) return '';
+  let stringValue = String(field);
+
+  // Prevent CSV injection (Excel formula execution)
+  if (stringValue.match(/^[=+\-@]/)) {
+    stringValue = "'" + stringValue;
+  }
+
+  // Escape if contains special characters
+  if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+
+  return stringValue;
+}
+
+function generateProductCSV(products) {
+  const BOM = '\uFEFF'; // UTF-8 BOM for Excel compatibility
+  const headers = ['Nom', 'Référence', 'Description', 'Prix (€)', 'Poids (kg)', 'Stock', 'Nombre de sorties'];
+
+  let csv = BOM + headers.join(',') + '\n';
+
+  products.forEach(product => {
+    const row = [
+      escapeCSVField(product.nom),
+      escapeCSVField(product.ref),
+      escapeCSVField(product.description),
+      escapeCSVField(product.prix),
+      escapeCSVField(product.poids),
+      escapeCSVField(product.stock),
+      escapeCSVField(product.nombre_de_sorties)
+    ];
+    csv += row.join(',') + '\n';
+  });
+
+  return csv;
+}
+
+// Export products to CSV with shipment counts
+app.post('/api/produits/export/csv', (req, res) => {
+  try {
+    const { produitIds } = req.body;
+
+    // Validate input
+    if (!Array.isArray(produitIds)) {
+      return res.status(400).json({ error: 'produitIds doit être un tableau' });
+    }
+
+    let products;
+
+    if (produitIds.length > 0) {
+      // Export selected products
+      const placeholders = produitIds.map(() => '?').join(',');
+      const query = `
+        SELECT
+          p.nom,
+          p.ref,
+          p.description,
+          p.prix,
+          p.poids,
+          p.stock,
+          COUNT(DISTINCT cp.colis_id) as nombre_de_sorties
+        FROM produits p
+        LEFT JOIN colis_produits cp ON p.id = cp.produit_id
+        WHERE p.id IN (${placeholders})
+        GROUP BY p.id, p.nom, p.ref, p.description, p.prix, p.poids, p.stock
+        ORDER BY p.nom
+      `;
+      products = db.prepare(query).all(...produitIds);
+    } else {
+      // Export all products
+      const query = `
+        SELECT
+          p.nom,
+          p.ref,
+          p.description,
+          p.prix,
+          p.poids,
+          p.stock,
+          COUNT(DISTINCT cp.colis_id) as nombre_de_sorties
+        FROM produits p
+        LEFT JOIN colis_produits cp ON p.id = cp.produit_id
+        GROUP BY p.id, p.nom, p.ref, p.description, p.prix, p.poids, p.stock
+        ORDER BY p.nom
+      `;
+      products = db.prepare(query).all();
+    }
+
+    // Generate CSV
+    const csvContent = generateProductCSV(products);
+
+    // Set headers and send file
+    const timestamp = new Date().getTime();
+    res.setHeader('Content-Type', 'text/csv;charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=produits_export_${timestamp}.csv`);
+    res.send(csvContent);
+
+  } catch (err) {
+    console.error('Erreur lors de l\'export CSV:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/produits/merge', (req, res) => {
   const { primaryId, secondaryIds } = req.body;
 

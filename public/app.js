@@ -3851,6 +3851,14 @@ function updateProduitSelection() {
         btnMerge.style.display = 'none';
     }
 
+    // Update export counter
+    const exportCount = document.getElementById('exportProduitsCount');
+    if (exportCount) {
+        exportCount.textContent = selectedProduits.size > 0
+            ? selectedProduits.size
+            : 'Tous';
+    }
+
     // Update select all checkbox
     const selectAll = document.getElementById('selectAllProduits');
     const allCheckboxes = document.querySelectorAll('.produit-checkbox');
@@ -3931,5 +3939,65 @@ async function confirmMergeProduits() {
     } catch (error) {
         console.error('Erreur fusion produits:', error);
         showToast('Erreur lors de la fusion', 'error');
+    }
+}
+
+// ============= EXPORT PRODUITS CSV =============
+
+async function exportProduitsCSV() {
+    try {
+        // Determine which products to export
+        const produitsToExport = selectedProduits.size > 0
+            ? Array.from(selectedProduits)
+            : [];
+
+        const exportType = produitsToExport.length > 0
+            ? `${produitsToExport.length} produit(s) sélectionné(s)`
+            : 'tous les produits';
+
+        // Confirmation
+        if (!confirm(`Exporter ${exportType} vers CSV ?`)) {
+            return;
+        }
+
+        // Show loading state
+        showToast('Génération du CSV...', 'info');
+
+        // Call API
+        const response = await fetch(`${API_URL}/api/produits/export/csv`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                produitIds: produitsToExport
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Erreur lors de l\'export');
+        }
+
+        // Download CSV file
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `produits_export_${new Date().getTime()}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        // Success feedback
+        showToast(`CSV exporté avec succès (${exportType})`, 'success');
+
+        // Clear selection after export
+        selectedProduits.clear();
+        document.querySelectorAll('.produit-checkbox').forEach(cb => cb.checked = false);
+        document.getElementById('selectAllProduits').checked = false;
+        updateProduitSelection();
+
+    } catch (error) {
+        console.error('Erreur export CSV:', error);
+        showToast('Erreur lors de l\'export CSV', 'error');
     }
 }
