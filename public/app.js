@@ -1849,24 +1849,51 @@ async function saveColis(event) {
         lien: p.lien || null
     }));
 
+    // Vérifier que les éléments DOM existent
+    const clientIdEl = document.getElementById('colisClientId');
+    const numeroSuiviEl = document.getElementById('colisNumeroSuivi');
+    const statutEl = document.getElementById('colisStatut');
+    const poidsEl = document.getElementById('colisPoids');
+    const dimensionsEl = document.getElementById('colisDimensions');
+    const referenceEl = document.getElementById('colisReference');
+    const adresseEl = document.getElementById('colisAdresse');
+    const adresseLigne2El = document.getElementById('colisAdresseLigne2');
+    const villeEl = document.getElementById('colisVille');
+    const codePostalEl = document.getElementById('colisCodePostal');
+    const paysEl = document.getElementById('colisPays');
+    const notesEl = document.getElementById('colisNotes');
+    const timbreIdEl = document.getElementById('selectedTimbreId');
+
+    if (!clientIdEl || !numeroSuiviEl || !statutEl) {
+        showToast('Erreur: formulaire incomplet', 'error');
+        return;
+    }
+
+    // Valider le client_id
+    const clientIdValue = parseInt(clientIdEl.value);
+    if (isNaN(clientIdValue) || clientIdValue <= 0) {
+        showToast('Veuillez sélectionner un client valide', 'error');
+        return;
+    }
+
     const data = {
-        client_id: parseInt(document.getElementById('colisClientId').value),
-        numero_suivi: document.getElementById('colisNumeroSuivi').value,
-        statut: document.getElementById('colisStatut').value,
-        poids: parseFloat(document.getElementById('colisPoids').value) || null,
-        dimensions: document.getElementById('colisDimensions').value,
-        reference: document.getElementById('colisReference').value,
-        adresse_expedition: document.getElementById('colisAdresse').value,
-        adresse_ligne2: document.getElementById('colisAdresseLigne2').value,
-        ville_expedition: document.getElementById('colisVille').value,
-        code_postal_expedition: document.getElementById('colisCodePostal').value,
-        pays_expedition: document.getElementById('colisPays').value,
-        notes: document.getElementById('colisNotes').value,
+        client_id: clientIdValue,
+        numero_suivi: numeroSuiviEl.value,
+        statut: statutEl.value,
+        poids: parseFloat(poidsEl?.value) || null,
+        dimensions: dimensionsEl?.value || '',
+        reference: referenceEl?.value || '',
+        adresse_expedition: adresseEl?.value || '',
+        adresse_ligne2: adresseLigne2El?.value || '',
+        ville_expedition: villeEl?.value || '',
+        code_postal_expedition: codePostalEl?.value || '',
+        pays_expedition: paysEl?.value || '',
+        notes: notesEl?.value || '',
         produits: produitsToSend
     };
 
     // Capturer l'ID du timbre avant de fermer la modale
-    const timbreId = document.getElementById('selectedTimbreId').value;
+    const timbreId = timbreIdEl?.value || '';
 
     // Fermer la modale immédiatement
     closeModal('modalColis');
@@ -1888,11 +1915,26 @@ async function saveColis(event) {
             // Si un timbre est sélectionné, le marquer comme utilisé
             const colisId = result.id || id; // ID du nouveau colis ou colis existant
             if (timbreId && colisId) {
-                await markTimbreAsUsed(timbreId, colisId);
+                try {
+                    await markTimbreAsUsed(timbreId, colisId);
+                } catch (timbreError) {
+                    // L'erreur est déjà loggée dans markTimbreAsUsed
+                    console.warn('Timbre non marqué, mais colis enregistré');
+                }
             }
 
             // Paralléliser les rechargements pour une meilleure performance
-            await Promise.all([loadColis(), loadProduits(), loadTimbres(), loadStats()]);
+            try {
+                await Promise.all([loadColis(), loadProduits(), loadTimbres(), loadStats()]);
+            } catch (reloadError) {
+                console.error('Erreur lors du rechargement des données:', reloadError);
+                // Essayer de recharger au moins les colis
+                try {
+                    await loadColis();
+                } catch (e) {
+                    console.error('Impossible de recharger les colis:', e);
+                }
+            }
 
             // Vérifier si des produits sont en stock négatif
             if (result.produitsNegatifs && result.produitsNegatifs.length > 0) {
@@ -1906,6 +1948,8 @@ async function saveColis(event) {
                 showToast('Colis enregistré avec succès!');
             }
         } else {
+            const errorText = await response.text().catch(() => 'Erreur inconnue');
+            console.error('Erreur serveur:', errorText);
             showToast('Erreur lors de la sauvegarde du colis', 'error');
         }
     } catch (error) {
@@ -3506,15 +3550,22 @@ async function markTimbreAsUsed(timbreId, colisId) {
     if (!timbreId) return;
 
     try {
-        await fetch(`${API_URL}/api/timbres/${timbreId}/utiliser`, {
+        const response = await fetch(`${API_URL}/api/timbres/${timbreId}/utiliser`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ colis_id: colisId })
         });
-        loadTimbres();
-        loadStats();
+
+        if (!response.ok) {
+            throw new Error(`Erreur serveur: ${response.status}`);
+        }
+
+        // Attendre que les rechargements se terminent
+        await Promise.all([loadTimbres(), loadStats()]);
     } catch (error) {
         console.error('Erreur marquage timbre:', error);
+        showToast('Erreur lors du marquage du timbre', 'error');
+        throw error; // Propager l'erreur pour que l'appelant puisse la gérer
     }
 }
 
