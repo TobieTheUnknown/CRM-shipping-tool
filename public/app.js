@@ -1493,6 +1493,10 @@ function filterColis() {
             if (notesData.item && notesData.item.toLowerCase().includes(searchTerm)) {
                 return true;
             }
+            // Rechercher aussi dans le texte brut des notes
+            if (c.notes.toLowerCase().includes(searchTerm)) {
+                return true;
+            }
         }
 
         return false;
