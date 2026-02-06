@@ -82,7 +82,7 @@ function closeMobileSidebar() {
 
 // Fermer la sidebar mobile lors du changement d'onglet
 function closeSidebarOnTabChange() {
-    if (window.innerWidth <= 968) {
+    if (window.innerWidth <= 1200) {
         closeMobileSidebar();
     }
 }

@@ -482,7 +482,8 @@ body::before {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
     margin-bottom: 24px;
 }
 
@@ -535,6 +536,34 @@ tbody tr:last-child td {
 .actions {
     display: flex;
     gap: 8px;
+}
+
+/* Sticky Actions Column */
+th:last-child,
+td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+}
+
+thead th:last-child {
+    background: var(--bg-secondary);
+}
+
+tbody td:last-child {
+    background: var(--bg-card);
+}
+
+tbody tr:hover td:last-child {
+    background: var(--bg-card-hover);
+}
+
+.non-france td:last-child {
+    background: rgba(251, 146, 60, 0.05);
+}
+
+.non-france:hover td:last-child {
+    background: rgba(251, 146, 60, 0.1);
 }
 
 /* Status Badges */
@@ -1632,19 +1661,10 @@ input[type="checkbox"] {
     opacity: 1;
 }
 
-/* Responsive */
+/* =============== RESPONSIVE =============== */
+
+/* 1200px: Sidebar collapses to hamburger, hide some table columns */
 @media (max-width: 1200px) {
-    .sidebar {
-        width: 240px;
-    }
-
-    .main-content {
-        margin-left: 240px;
-        width: calc(100% - 240px);
-    }
-}
-
-@media (max-width: 968px) {
     .mobile-menu-btn {
         display: flex;
     }
@@ -1654,18 +1674,40 @@ input[type="checkbox"] {
     }
 
     .sidebar {
+        width: 280px;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
     }
 
     .sidebar.mobile-open {
         transform: translateX(0);
-        box-shadow: var(--shadow-xl);
+        box-shadow: 10px 0 40px rgba(0, 0, 0, 0.5);
     }
 
     .main-content {
         margin-left: 0;
         width: 100%;
+        padding: 80px 30px 30px 30px;
+    }
+
+    /* Colis tables: hide Date (col 2) and N° Suivi (col 7) */
+    .colisTable th:nth-child(2),
+    .colisTable td:nth-child(2),
+    .colisTable th:nth-child(7),
+    .colisTable td:nth-child(7) {
+        display: none;
+    }
+
+    /* Produit column: allow more space */
+    .colisTable td:nth-child(3) {
+        max-width: none;
+        white-space: normal;
+    }
+}
+
+/* 968px: Stack layout, hide more columns */
+@media (max-width: 968px) {
+    .main-content {
         padding: 80px 20px 20px 20px;
     }
 
@@ -1682,6 +1724,7 @@ input[type="checkbox"] {
 
     .actions-bar .search-bar {
         width: 100%;
+        max-width: none;
         order: -1;
     }
 
@@ -1704,6 +1747,34 @@ input[type="checkbox"] {
 
     .page-title {
         font-size: 24px;
+    }
+
+    /* Colis tables: also hide Checkbox (col 1) and Poids (col 6) */
+    .colisTable th:nth-child(1),
+    .colisTable td:nth-child(1),
+    .colisTable th:nth-child(6),
+    .colisTable td:nth-child(6) {
+        display: none;
+    }
+
+    /* Clients table: hide Prénom, Email, Téléphone */
+    #clientsTable th:nth-child(4),
+    #clientsTable td:nth-child(4),
+    #clientsTable th:nth-child(5),
+    #clientsTable td:nth-child(5),
+    #clientsTable th:nth-child(6),
+    #clientsTable td:nth-child(6) {
+        display: none;
+    }
+
+    /* Produits table: hide Ref, Description, Poids */
+    #produitsTable th:nth-child(3),
+    #produitsTable td:nth-child(3),
+    #produitsTable th:nth-child(4),
+    #produitsTable td:nth-child(4),
+    #produitsTable th:nth-child(6),
+    #produitsTable td:nth-child(6) {
+        display: none;
     }
 }
 
