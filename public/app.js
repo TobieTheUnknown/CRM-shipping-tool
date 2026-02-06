@@ -1564,18 +1564,18 @@ function renderColisRow(c, section) {
     // Produit avec lien cliquable - nouveau système avec produits multiples
     let produitHtml = '';
     if (c.produits && c.produits.length > 0) {
-        // Afficher les noms des produits
-        const nomsProduitsArr = c.produits.map(p => p.nom || 'Produit');
-        const nomsProduits = nomsProduitsArr.length > 2
-            ? nomsProduitsArr.slice(0, 2).join(', ') + ` (+${nomsProduitsArr.length - 2})`
-            : nomsProduitsArr.join(', ');
-
+        const multipleTypes = c.produits.length > 1;
+        const totalItems = c.produits.reduce((sum, p) => sum + (p.quantite || 1), 0);
+        const lignes = c.produits.map(p => {
+            const qty = p.quantite || 1;
+            const qtyHtml = qty > 1 ? `<span class="product-qty">(${qty}x)</span> ` : '';
+            return `<span class="product-line">${qtyHtml}${p.nom || 'Produit'}</span>`;
+        });
+        const totalBadge = '';
         const hasAnyLink = c.produits.some(p => p.lien);
-        if (hasAnyLink || c.produits.length > 1) {
-            produitHtml = `<span class="product-name produit-clickable" onclick="handleProduitClick(${c.id})" title="Cliquez pour voir les détails">${nomsProduits}</span>`;
-        } else if (c.produits.length === 1) {
-            produitHtml = `<span class="product-name">${nomsProduits}</span>`;
-        }
+        const clickable = hasAnyLink || multipleTypes;
+        const clickAttr = clickable ? ` produit-clickable" onclick="handleProduitClick(${c.id})" title="Cliquez pour voir les détails` : '';
+        produitHtml = `<div class="product-list${clickAttr}">${lignes.join('')}${totalBadge}</div>`;
     } else if (notesData.item && notesData.lien) {
         // Fallback ancien système
         produitHtml = `<a href="${notesData.lien}" target="_blank" class="product-link">${notesData.item}</a>`;

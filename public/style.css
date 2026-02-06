@@ -922,6 +922,44 @@ input[type="checkbox"] {
     margin-bottom: 2px;
 }
 
+.product-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.product-list.produit-clickable {
+    cursor: pointer;
+}
+
+.product-list.produit-clickable:hover .product-line {
+    color: var(--primary);
+}
+
+.product-line {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+    line-height: 1.4;
+}
+
+.product-qty {
+    color: #f59e0b;
+    font-weight: 700;
+}
+
+.total-items-badge {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-top: 2px;
+}
+
 .client-address {
     display: block;
     font-size: 12px;
