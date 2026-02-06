@@ -58,6 +58,35 @@ function showToast(message, type = 'success', title = null, duration = 3000) {
     }
 }
 
+// ============= MOBILE SIDEBAR =============
+
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.querySelector('.mobile-overlay');
+    const menuBtn = document.querySelector('.mobile-menu-btn');
+
+    sidebar.classList.toggle('mobile-open');
+    overlay.classList.toggle('active');
+    menuBtn.classList.toggle('active');
+}
+
+function closeMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.querySelector('.mobile-overlay');
+    const menuBtn = document.querySelector('.mobile-menu-btn');
+
+    sidebar.classList.remove('mobile-open');
+    overlay.classList.remove('active');
+    menuBtn.classList.remove('active');
+}
+
+// Fermer la sidebar mobile lors du changement d'onglet
+function closeSidebarOnTabChange() {
+    if (window.innerWidth <= 968) {
+        closeMobileSidebar();
+    }
+}
+
 // ============= INITIALISATION =============
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -93,6 +122,9 @@ function switchTab(tabId) {
     // Activer le nav item et tab sélectionnés
     document.querySelector(`.nav-item[data-tab="${tabId}"]`).classList.add('active');
     document.getElementById(`tab-${tabId}`).classList.add('active');
+
+    // Fermer la sidebar sur mobile après le changement d'onglet
+    closeSidebarOnTabChange();
 }
 
 // ============= STATISTIQUES =============
@@ -3483,9 +3515,11 @@ function selectTimbreFromDropdown() {
     document.getElementById('timbreInfo').textContent = '(timbre sélectionné)';
     document.getElementById('timbreInfo').style.color = 'var(--accent-green)';
 
-    // Auto-remplir le poids avec le poids max du timbre sélectionné
+    // Auto-remplir le poids avec le poids max du timbre sélectionné (convertir grammes en kg)
     if (selectedOption.dataset.poidsMax) {
-        document.getElementById('colisPoids').value = selectedOption.dataset.poidsMax;
+        const poidsMaxGrammes = parseFloat(selectedOption.dataset.poidsMax);
+        const poidsMaxKg = poidsMaxGrammes / 1000;
+        document.getElementById('colisPoids').value = poidsMaxKg.toFixed(2);
     }
 
     updateLienSuiviPreview();
@@ -3513,6 +3547,14 @@ async function autoSelectTimbre() {
     selectedTimbreId = null;
 
     if (!poids || poids <= 0) return;
+
+    // Ne sélectionner automatiquement un timbre que si le pays est France
+    const pays = document.getElementById('colisPays').value;
+    if (pays && pays.toLowerCase() !== 'france') {
+        document.getElementById('timbreInfo').textContent = '(pays étranger - sélection manuelle)';
+        document.getElementById('timbreInfo').style.color = 'var(--accent-orange)';
+        return;
+    }
 
     const timbre = await findTimbreForPoids(poids);
 

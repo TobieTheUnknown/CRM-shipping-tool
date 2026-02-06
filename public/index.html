@@ -7,9 +7,19 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Mobile Menu Button -->
+    <button class="mobile-menu-btn" onclick="toggleMobileSidebar()">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" onclick="closeMobileSidebar()"></div>
+
     <div class="container">
         <!-- SIDEBAR -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
                     <div class="logo-icon">📦</div>
